@@ -112,7 +112,7 @@ app.post('/api/generate', async (req, res) => {
     const system = buildSystemPrompt();
     const userMsg = buildBlockPrompt(block, params);
     const heavy = ['onboard', 'sequence', 'creatives_prompt', 'audios', 'quiz'].includes(block);
-    const text = await callClaude(apiKey, model, system, userMsg, heavy ? 16000 : 7000);
+    const text = await callClaude(apiKey, model, system, userMsg, heavy ? 20000 : 7000);
 
     const json = extractJSON(text);
     // formato: { raw, json, kind } — frontend decide como exibir/baixar
@@ -190,30 +190,49 @@ SLUG: ${nslug}`;
     case 'onboard':
       return `${ctx}
 Gere o ONBOARD completo na plataforma ${p.platform}.
-Numero de rotas de conteudo: ${p.onboardRoutes || 7}. Tipo: ${p.onboardRouteType || 'menu'}.
+Numero de rotas de CONTEUDO: ${p.onboardRoutes || 7} (alem da rota 0 random e da ultima rota goto).
+Tipo das rotas: ${p.onboardRouteType || 'menu'} (menu=card com imagem, botoes=texto+botao, misto=alterne entre os dois).
 Idioma do fluxo: ${p.flowLang || 'en-US'}. Persona: ${p.personaLabel}.
-${p.imagePrompts ? 'NAO inclua image_prompts aqui (serao gerados em bloco separado).' : ''}
-Use a estrutura EXATA da plataforma ${p.platform}. routes[0] random; ultima rota goto. Cada rota de conteudo com seu redirect_target.
-Responda APENAS o JSON do flow, valido e completo.`;
 
-    case 'sequence':
+ESTRUTURA OBRIGATORIA (ChatDrink):
+1) routes[0]: SO random. interactions:[{type:"random",config:{routes:[]},sort_order:0}]
+2) routes[1..${p.onboardRoutes || 7}]: cada uma ISOLADA com EXATAMENTE [digitando, ${p.onboardRouteType && p.onboardRouteType.indexOf('boto') >= 0 ? 'botoes' : p.onboardRouteType && p.onboardRouteType.indexOf('misto') >= 0 ? '(menu ou botoes alternando)' : 'menu'}]. Cada uma redireciona com redirect_type:"route" e redirect_target:9999 (placeholder da ultima rota). SEM mensagem, SEM quick_replies.
+3) ultima rota (route_${(p.onboardRoutes || 7) + 1}): SO goto, nada mais. config:{target_type:"flow",target_route:"",target_flow:"433"}
+Total de rotas no array: ${(p.onboardRoutes || 7) + 2} (1 random + ${p.onboardRoutes || 7} conteudo + 1 goto).
+A copy de cada rota deve ser unica e persuasiva pro nicho. image_url use "https://via.placeholder.com/1200x628".
+Responda APENAS o JSON do flow, valido e completo, sem markdown.`;
+
+    case 'sequence': {
+      const nseq = p.seqRoutes || 3;
+      // adapta trios por rota pra caber no orcamento de tokens e nao truncar
+      const trios = nseq <= 2 ? 9 : nseq <= 4 ? 7 : nseq <= 6 ? 5 : 4;
       return `${ctx}
 Gere a SEQUENCIA completa na plataforma ${p.platform}.
-ATENCAO CRITICA: o usuario quer ${p.seqRoutes || 3} SEQUENCIAS. Isso significa ${p.seqRoutes || 3} ROTAS de conteudo (route_1 ... route_${p.seqRoutes || 3}), e CADA rota deve conter UMA SEQUENCIA COMPLETA — um unico array de interactions com 8 a 12 trios escalando: delay -> menu -> mensagem(quick_reply) repetidos. NAO faça uma rota por mensagem. routes[0] = random apontando pra todas as ${p.seqRoutes || 3} rotas.
-Delays escalam: 3min, 5min, 10min, 15min, 30min, 1h, 2h, 3h...
-Cada trio: menu (card com imagem + botao pro blog) + mensagem (texto da persona ${p.personaLabel} + quick_reply pra fallback). Varie os angulos de urgencia/storytelling entre as rotas.
+O usuario quer ${nseq} SEQUENCIAS = ${nseq} ROTAS de conteudo (route_1 ... route_${nseq}). CADA rota e UMA SEQUENCIA COMPLETA: um unico array "interactions" com ${trios} trios escalando no tempo: delay -> menu -> mensagem(com quick_reply) repetidos ${trios}x. NUNCA faça uma rota por mensagem.
+routes[0] = SO random apontando pra todas: interactions:[{type:"random",config:{routes:[]},sort_order:0}].
+Delays escalam dentro de cada rota: 3min, 5min, 10min, 15min, 30min, 1h, 2h, 3h.
+Cada trio: menu (card com imagem "https://via.placeholder.com/1200x628" + botao pro blog) + mensagem (texto curto da persona ${p.personaLabel} + 1 quick_reply pra fallback com target_route:9999). Varie o angulo de urgencia/storytelling entre as ${nseq} rotas.
 Idioma do fluxo: ${p.flowLang || 'en-US'}.
-Responda APENAS o JSON do flow, valido e completo.`;
+CRITICO: gere JSON 100% VALIDO e COMPLETO. Feche TODAS as chaves e colchetes. Seja conciso nos textos (1-2 frases) pra nao truncar. Responda APENAS o JSON, sem markdown, sem crases.`;
+    }
+
+    case 'grid_preview':
+      return `${ctx}
+Antes de gerar o grid completo, proponha a DIRECAO VISUAL do MIRB grid pro nicho "${p.niche}".
+Defina paleta (3-4 cores hex), tom e estilo. REGRA CRITICA DE LEGIBILIDADE: o texto dos titulos deve ser de ALTO CONTRASTE e facil de ler — fontes marcantes (Georgia, Poppins, Montserrat, Arial Black), peso 600-800, cor com contraste forte sobre o fundo do item (NUNCA texto claro sobre fundo claro, nunca cor fraca/apagada). Prefira fundo do item-title solido ou escuro com texto claro vibrante, OU fundo claro com texto escuro forte.
+Responda JSON: {"palette":["#hex","#hex","#hex"],"font":"<nome da fonte>","title_color":"#hex","item_bg":"#hex","item_text_color":"#hex","mood":"<1 frase descrevendo o visual>"}`;
 
     case 'grid':
       return `${ctx}
 Gere o MIRB GRID no formato de IMPORTACAO exato (para importar no plugin WordPress).
 Grid: ${p.gridCols} colunas. Total de itens: ${p.gridCols * p.gridRows}.
 Idioma do conteudo: ${p.contentLang}. ${p.currency !== 'USD' ? 'Moeda ' + p.currency + ' se citar valores.' : ''}
-Inclua CSS personalizado combinando com o tema do nicho, TODAS as regras com !important, usando classes .mirb-grid-container .mirb-grid-title .mirb-grid-subtitle .mirb-grid-item .mirb-grid-item:hover .mirb-grid-item-title .mirb-grid-footer .mirb-grid-footer-line .mirb-grid-footer-highlight.
-Para cada item, item_image deve ser uma string de busca do Pinterest em INGLES (placeholder pra imagem).
+${p.gridDirection ? 'USE esta direcao visual aprovada: ' + JSON.stringify(p.gridDirection) : ''}
+CSS personalizado combinando com o tema, TODAS as regras com !important. Classes: .mirb-grid-container .mirb-grid-title .mirb-grid-subtitle .mirb-grid-item .mirb-grid-item:hover .mirb-grid-item-title .mirb-grid-footer .mirb-grid-footer-line .mirb-grid-footer-highlight.
+REGRA CRITICA DE LEGIBILIDADE (NAO IGNORE): os titulos dos itens (.mirb-grid-item-title) e o titulo (.mirb-grid-title) precisam de ALTO CONTRASTE e fonte marcante. Use font-weight 700-800, font-family forte (Georgia/Poppins/Montserrat/Arial Black), e font-size >= 16px. NADA de texto apagado, cinza claro sobre branco, ou cor fraca. O texto deve SALTAR aos olhos. Se o fundo do item for claro, texto escuro forte; se escuro, texto claro vibrante. Adicione text-shadow sutil pra reforcar.
+Para cada item, item_image = string de busca do Pinterest em INGLES.
 Responda EXATAMENTE neste formato JSON:
-{"version":"1.2.2","export_date":"<data>","grid":{"grid_name":"<nome curto>","title":"<titulo no idioma do conteudo>","subtitle":"<subtitulo curto>","columns":"${p.gridCols}","global_link":"","use_global_link":"0","custom_css":"<css com !important>","footer_text_1":"<texto>","footer_text_2":"GRATIS!"},"items":[{"item_title":"<LABEL>","item_image":"<pinterest search EN>","item_link":"","item_order":"0"}]}
+{"version":"1.2.2","export_date":"<data>","grid":{"grid_name":"<nome curto>","title":"<titulo no idioma do conteudo>","subtitle":"<subtitulo curto>","columns":"${p.gridCols}","global_link":"","use_global_link":"0","custom_css":"<css com !important e fontes legiveis>","footer_text_1":"<texto>","footer_text_2":"GRATIS!"},"items":[{"item_title":"<LABEL>","item_image":"<pinterest search EN>","item_link":"","item_order":"0"}]}
 Gere exatamente ${p.gridCols * p.gridRows} items com item_order incremental.`;
 
     case 'p1_titles':

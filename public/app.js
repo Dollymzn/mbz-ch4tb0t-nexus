@@ -54,7 +54,7 @@ function loadConfig(){
     fillSel('#persona',cfg.personas,'id','label','sem_persona');
     fillSel('#creativePlatform',cfg.creativePlatforms,'id','label','svg_claude');
     fillSel('#creativeSize',cfg.creativeSizes,'id','label','1080x1440');
-    ['#optModel','#modelGlobal'].forEach(function(s){fillModels(s)});
+    ['#optModel','#modelGlobal','#modelWizard'].forEach(function(s){fillModels(s)});
     $('#modelFoot').textContent='modelo: '+MODEL;
     if(cfg.needPassword&&!ACCESS_PASS) showGate(); else verifyEnter();
   });
@@ -64,7 +64,7 @@ function fillModels(sel){
   [['claude-sonnet-4-6','Sonnet 4.6 (rápido)'],['claude-opus-4-8','Opus 4.8 (qualidade)'],['claude-haiku-4-5-20251001','Haiku 4.5 (econômico)']]
   .forEach(function(m){var o=document.createElement('option');o.value=m[0];o.textContent=m[1];if(m[0]===MODEL)o.selected=true;el.appendChild(o)});
   el.onchange=function(){MODEL=el.value;localStorage.setItem('mbz_model',MODEL);$('#modelFoot').textContent='modelo: '+MODEL;
-    ['#optModel','#modelGlobal'].forEach(function(s){if($(s))$(s).value=MODEL})};
+    ['#optModel','#modelGlobal','#modelWizard'].forEach(function(s){if($(s))$(s).value=MODEL})};
 }
 function fillSel(sel,items,vk,lk,def){var el=$(sel);if(!el)return;el.innerHTML='';items.forEach(function(it){var o=document.createElement('option');o.value=it[vk];o.textContent=it[lk];if(it[vk]===def)o.selected=true;el.appendChild(o)})}
 
@@ -237,21 +237,47 @@ function runForge(){
   if(!lastParams.niche){toast('Digite o nicho.');gotoStep(1);return}
   if(!CFG.serverKey&&!USER_KEY){$('#keyModal').classList.remove('hidden');return}
   var blocks=selectedBlocks();if(!blocks.length){toast('Marque ao menos um bloco.');return}
-  var out=$('#output');out.innerHTML='';lastBlocks={};
+  var out=$('#output');out.innerHTML='';lastBlocks={};delete lastParams.gridDirection;
   $('#wizForge').disabled=true;$('#classicForge').disabled=true;$('#outputActions').classList.add('hidden');
   blocks.forEach(function(b){out.appendChild(makeCard(b))});
   out.scrollIntoView({behavior:'smooth',block:'start'});
   var i=0;
-  (function next(){
+  function step(){
     if(i>=blocks.length){$('#wizForge').disabled=false;$('#classicForge').disabled=false;$('#outputActions').classList.remove('hidden');toast('Funil gerado! ⚡');return}
-    var b=blocks[i];setStatus(b,'loading');
-    fetch('/api/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({block:b,params:lastParams,model:MODEL})})
-    .then(function(r){return r.json()}).then(function(res){
-      if(res.error){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(res.error)+'</pre>')}
-      else{lastBlocks[b]={raw:res.raw,json:res.json};setStatus(b,'done');renderBlock(b,res)}
-      i++;next();
-    }).catch(function(err){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(err.message)+'</pre>');i++;next()});
-  })();
+    var b=blocks[i];i++;setStatus(b,'loading');
+    if(b==='grid'&&!lastParams.gridDirection){
+      fetch('/api/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({block:'grid_preview',params:lastParams,model:MODEL})})
+      .then(function(r){return r.json()}).then(function(res){
+        var dir=res.json||safeParse(res.raw);
+        if(dir){lastParams.gridDirection=dir;showGridDirection(b,dir)}
+        genBlock(b,step);
+      }).catch(function(){genBlock(b,step)});
+      return;
+    }
+    genBlock(b,step);
+  }
+  step();
+}
+
+function genBlock(b,done){
+  fetch('/api/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({block:b,params:lastParams,model:MODEL})})
+  .then(function(r){return r.json()}).then(function(res){
+    if(res.error){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(res.error)+'</pre>')}
+    else{lastBlocks[b]={raw:res.raw,json:res.json};setStatus(b,'done');renderBlock(b,res)}
+    done();
+  }).catch(function(err){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(err.message)+'</pre>');done()});
+}
+function showGridDirection(b,dir){
+  var sw=(dir.palette||[]).map(function(c){return '<span style="display:inline-block;width:22px;height:22px;border-radius:5px;background:'+esc(c)+';margin-right:6px;vertical-align:middle;border:1px solid #333"></span>'}).join('');
+  var html='<div class="clean-view"><span class="tag">DIREÇÃO VISUAL</span>'+
+    '<p>'+sw+'</p>'+
+    '<p><b>Fonte:</b> '+esc(dir.font||'')+'</p>'+
+    '<p style="background:'+esc(dir.item_bg||'#222')+';color:'+esc(dir.item_text_color||'#fff')+';padding:10px 16px;border-radius:8px;font-family:'+esc(dir.font||'Georgia')+';font-weight:700;display:inline-block">Exemplo de título do item</p>'+
+    '<p style="margin-top:10px;color:var(--muted)">'+esc(dir.mood||'')+'</p></div>';
+  var pc=document.createElement('div');pc.className='block-card';
+  pc.innerHTML='<div class="block-head"><span class="block-title">◢ Grid · Prévia visual</span><span class="block-status done">✓ prévia</span></div><div class="block-body">'+html+'</div>';
+  var gridCard=$('#card-grid');
+  if(gridCard&&gridCard.parentNode)gridCard.parentNode.insertBefore(pc,gridCard);
 }
 
 function makeCard(b){

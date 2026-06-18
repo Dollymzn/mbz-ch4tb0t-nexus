@@ -17,7 +17,15 @@ REGRA DE OURO DA SEQUENCIA CHATDRINK:
   * "mensagem": config { "text","buttons":[],"redirect_type":"","redirect_target":"","quick_replies":[{"label","action_type":"route","target_route":<int>,"target_flow":""}] }
   * "botoes": config { "title","buttons":[{"label","action_type":"url","url","urls":[{"url","weight":100}]}],"redirect_type":"","redirect_target":"" }
 - Padrao vencedor de cada trio: menu (card com imagem + botao pro blog) + mensagem (texto curto da persona + quick_reply pra fallback/loop).
-- ONBOARD ChatDrink: routes[0] random; rotas de conteudo = [digitando + menu/botoes] com redirect_target; ultima rota = goto { "type":"goto","config":{"target_type":"flow","target_route":"","target_flow":"<ID>"} }.
+REGRA DE OURO DO ONBOARD CHATDRINK (SIGA EXATAMENTE - NAO INVENTE):
+- routes[0] = SO random: {"id":"route_0","name":"Rota 1","sort_order":0,"color":null,"interactions":[{"type":"random","config":{"routes":[]},"sort_order":0}]}
+- Cada rota de conteudo (route_1...route_N-1) e ISOLADA e tem EXATAMENTE 2 interactions: [digitando, (menu OU botoes)]. NUNCA use "mensagem" no onboard. NUNCA use quick_replies no onboard.
+  * digitando: config {"duration":3,"redirect_type":"","redirect_target":""}
+  * menu: config {"cards":[{"title","subtitle","image_url":"https://via.placeholder.com/1200x628","buttons":[{"label","action_type":"url","url","urls":[{"url","weight":100}]}]}],"redirect_type":"route","redirect_target":9999}
+  * botoes: config {"title","buttons":[{"label","action_type":"url","url","urls":[{"url","weight":100}]}],"redirect_type":"route","redirect_target":9999}
+- TODAS as rotas de conteudo redirecionam pro MESMO destino: a ULTIMA rota (use redirect_target:9999 como placeholder do id da ultima rota). NUNCA uma rota de conteudo aponta pra outra rota de conteudo. Sem cadeia entre elas - cada uma e um beco isolado que cai na ultima.
+- A ULTIMA rota tem SO o goto, NADA mais: {"id":"route_N","name":"Rota N+1","sort_order":N,"color":null,"interactions":[{"type":"goto","config":{"target_type":"flow","target_route":"","target_flow":"433"},"sort_order":0}]}
+- Variar SOMENTE o tipo (menu/botoes/misto conforme pedido) e a quantidade. A copy varia entre rotas, a estrutura e sempre essa.
 
 URLs sequencia: {{URL_REDIR}}?utm_source=sequence&utm_campaign={{UTM_CAMPAIGN}}&utm_medium={{NOMEDAPAGINA}}&utm_term=sequence&utm_content=seq1-<nicho>
 URLs onboard: {{URL_REDIR}}?utm_source=onboard&utm_campaign={{UTM_CAMPAIGN}}&utm_medium={{NOMEDAPAGINA}}&utm_term=onboard&utm_content=onb1-<nicho>
