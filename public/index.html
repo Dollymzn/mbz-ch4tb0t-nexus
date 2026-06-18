@@ -5,205 +5,300 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MBZ::CH4TB0T NEXUS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<canvas id="fx"></canvas>
 <div class="scanlines"></div>
-<div class="grid-bg"></div>
+<div class="vignette"></div>
 
-<!-- LOGIN GATE -->
+<!-- ===== GATE ===== -->
 <div id="gate" class="gate hidden">
   <div class="gate-box">
+    <div class="gate-glitch" data-text="NEXUS">NEXUS</div>
     <div class="gate-logo">MBZ::CH4TB0T<span>NEXUS</span></div>
-    <p class="gate-sub">Acesso restrito — MBOLIVEIRAZ MEDIA &amp; TECH</p>
+    <p class="gate-sub">// acesso restrito — MBOLIVEIRAZ MEDIA &amp; TECH</p>
     <input type="password" id="gatePass" placeholder="senha de acesso" autocomplete="off">
-    <button id="gateBtn">ENTRAR ⚡</button>
+    <button id="gateBtn" class="btn-primary">INICIAR SESSÃO <span>⚡</span></button>
     <div id="gateErr" class="gate-err"></div>
   </div>
 </div>
 
-<!-- APP -->
+<!-- ===== APP ===== -->
 <div id="app" class="app hidden">
   <header class="topbar">
-    <div class="logo">MBZ::CH4TB0T<span>NEXUS</span></div>
+    <div class="brand">
+      <div class="brand-mark">◆</div>
+      <div class="brand-name">MBZ::CH4TB0T<span>NEXUS</span></div>
+    </div>
     <nav class="tabs">
-      <button class="tab active" data-tab="creator">⚡ CRIADOR</button>
-      <button class="tab" data-tab="optimizer">🔧 OTIMIZADOR</button>
-      <button class="tab" data-tab="history">📂 HISTÓRICO</button>
+      <button class="tab active" data-tab="creator"><i>⚡</i> CRIADOR</button>
+      <button class="tab" data-tab="optimizer"><i>🔧</i> OTIMIZADOR</button>
+      <button class="tab" data-tab="history"><i>📂</i> HISTÓRICO</button>
     </nav>
-    <div class="clock" id="clock">--:--:--</div>
+    <div class="status-cluster">
+      <span class="status-dot" id="connDot"></span>
+      <span class="clock" id="clock">--:--:--</span>
+    </div>
   </header>
 
-  <!-- ===== CRIADOR ===== -->
-  <section id="tab-creator" class="panel">
-    <div class="config-grid">
-      <div class="field">
-        <label>NICHO</label>
-        <input type="text" id="niche" placeholder="ex: Carta de Amor, Copa do Mundo, Skincare">
-      </div>
-      <div class="field">
-        <label>NOME DA PÁGINA FB <button class="mini" id="suggestName">sugerir ✨</button></label>
-        <input type="text" id="pageName" placeholder="ex: Aurora del Amor">
-      </div>
-      <div class="field">
-        <label>IDIOMA DO FLUXO (chatbot)</label>
-        <select id="flowLang"></select>
-      </div>
-      <div class="field">
-        <label>IDIOMA DO CONTEÚDO (blog)</label>
-        <select id="contentLang"></select>
-      </div>
-      <div class="field">
-        <label>MOEDA LOCAL</label>
-        <select id="currency"></select>
-      </div>
-      <div class="field">
-        <label>PERSONA</label>
-        <select id="persona"></select>
-      </div>
-      <div class="field">
-        <label>PLATAFORMA CHATBOT</label>
-        <select id="platform">
-          <option value="chatdrink">ChatDrink</option>
-          <option value="chatfood">ChatFood</option>
-        </select>
-        <div class="warn" id="platformWarn">⚠️ ChatDrink e ChatFood têm formatos JSON muito diferentes. Confira a plataforma antes de gerar.</div>
-      </div>
-      <div class="field">
-        <label>MODELO IA</label>
-        <select id="model">
-          <option value="claude-sonnet-4-6">Sonnet 4.6 (rápido)</option>
-          <option value="claude-opus-4-8">Opus 4.8 (qualidade)</option>
-          <option value="claude-haiku-4-5-20251001">Haiku 4.5 (econômico)</option>
-        </select>
-      </div>
+  <!-- ============ CRIADOR ============ -->
+  <section id="tab-creator" class="view">
+
+    <!-- mode switch -->
+    <div class="mode-switch">
+      <button id="modeWizard" class="mode-btn active">🧭 PASSO A PASSO</button>
+      <button id="modeClassic" class="mode-btn">⚙️ MODO CLÁSSICO</button>
     </div>
 
-    <div class="config-grid">
-      <div class="field">
-        <label>Nº ROTAS ONBOARD</label>
-        <input type="number" id="onboardRoutes" value="7" min="1" max="20">
+    <!-- ===== WIZARD ===== -->
+    <div id="wizard" class="wizard">
+      <!-- progress rail -->
+      <div class="rail">
+        <div class="rail-line"><div class="rail-fill" id="railFill"></div></div>
+        <div class="rail-steps" id="railSteps"></div>
       </div>
-      <div class="field">
-        <label>TIPO ROTAS ONBOARD</label>
-        <select id="onboardRouteType">
-          <option value="menu (cards com imagem)">Menu (cards com imagem)</option>
-          <option value="botoes (texto + botão)">Botões (texto + botão)</option>
-          <option value="misto (texto e cards)">Misto (texto e cards)</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Nº ROTAS SEQUÊNCIA</label>
-        <input type="number" id="seqRoutes" value="3" min="1" max="10">
-      </div>
-      <div class="field">
-        <label>Nº DE P1</label>
-        <input type="number" id="numP1" value="7" min="1" max="20">
-      </div>
-      <div class="field">
-        <label>GRID (colunas × linhas)</label>
-        <div class="grid-dims">
-          <input type="number" id="gridCols" value="2" min="1" max="4"> ×
-          <input type="number" id="gridRows" value="4" min="1" max="8">
-          <span class="grid-calc" id="gridCalc">= 8 P2s</span>
+
+      <div class="wizard-stage">
+        <!-- STEP 1 -->
+        <div class="step active" data-step="1">
+          <div class="step-eyebrow">PASSO 1 / 5</div>
+          <h2 class="step-title">Qual é o nicho?</h2>
+          <p class="step-help">Digite o tema da campanha. É a partir daqui que tudo é gerado.</p>
+          <div class="big-field">
+            <input type="text" id="niche" placeholder="ex: Carta de Amor, Copa do Mundo, Cartão de Crédito">
+          </div>
+          <div class="inline-suggest">
+            <label>Nome da página no Facebook</label>
+            <div class="suggest-row">
+              <input type="text" id="pageName" placeholder="ex: Aurora del Amor">
+              <button id="suggestName" class="btn-ghost-sm">✨ Sugerir do nicho</button>
+            </div>
+            <div class="suggest-chips" id="nameChips"></div>
+          </div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="step" data-step="2">
+          <div class="step-eyebrow">PASSO 2 / 5</div>
+          <h2 class="step-title">Idioma, moeda e voz</h2>
+          <p class="step-help">O fluxo do chatbot fica em inglês por padrão (o sistema traduz). Escolha a persona que vai falar com o lead.</p>
+          <div class="card-grid">
+            <div class="sel-card">
+              <label>🌐 Idioma do fluxo (chatbot)</label>
+              <select id="flowLang"></select>
+              <small>Padrão: inglês — traduzido por página</small>
+            </div>
+            <div class="sel-card">
+              <label>📝 Idioma do conteúdo (blog)</label>
+              <select id="contentLang"></select>
+              <small>P1, P2, grid e quiz</small>
+            </div>
+            <div class="sel-card">
+              <label>💰 Moeda local</label>
+              <select id="currency"></select>
+              <small>Usada na copy do Meta</small>
+            </div>
+            <div class="sel-card persona-card">
+              <label>🎭 Persona</label>
+              <select id="persona"></select>
+              <small>Quem conversa com o lead</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="step" data-step="3">
+          <div class="step-eyebrow">PASSO 3 / 5</div>
+          <h2 class="step-title">Estrutura do funil</h2>
+          <p class="step-help">Defina a plataforma e o tamanho de cada peça. As P2 são calculadas pelo formato do grid.</p>
+
+          <div class="platform-pick">
+            <label class="platform-opt">
+              <input type="radio" name="platform" value="chatdrink" checked>
+              <div class="platform-box"><b>ChatDrink</b><span>proprietário · sem limite de páginas</span></div>
+            </label>
+            <label class="platform-opt">
+              <input type="radio" name="platform" value="chatfood">
+              <div class="platform-box"><b>ChatFood</b><span>multi-idioma · limite de páginas</span></div>
+            </label>
+          </div>
+          <div class="warn-strip">⚠️ ChatDrink e ChatFood usam formatos JSON diferentes. A ferramenta gera o correto pra plataforma escolhida.</div>
+
+          <div class="steppers">
+            <div class="stepper">
+              <label>Rotas no onboard</label>
+              <div class="stepper-ctrl"><button data-dec="onboardRoutes">−</button><input type="number" id="onboardRoutes" value="7" min="1" max="20"><button data-inc="onboardRoutes">+</button></div>
+            </div>
+            <div class="stepper">
+              <label>Tipo das rotas</label>
+              <select id="onboardRouteType">
+                <option value="menu (cards com imagem)">Cards com imagem</option>
+                <option value="botoes (texto + botão)">Texto + botão</option>
+                <option value="misto (texto e cards)">Misto</option>
+              </select>
+            </div>
+            <div class="stepper">
+              <label>Sequências (cada uma = 1 rota completa)</label>
+              <div class="stepper-ctrl"><button data-dec="seqRoutes">−</button><input type="number" id="seqRoutes" value="3" min="1" max="10"><button data-inc="seqRoutes">+</button></div>
+            </div>
+            <div class="stepper">
+              <label>Quantidade de P1 (= nº de quizzes)</label>
+              <div class="stepper-ctrl"><button data-dec="numP1">−</button><input type="number" id="numP1" value="7" min="1" max="20"><button data-inc="numP1">+</button></div>
+            </div>
+          </div>
+
+          <div class="grid-builder">
+            <label>Formato do grid MIRB</label>
+            <div class="grid-builder-row">
+              <div class="dim-ctrl"><button data-dec="gridCols">−</button><input type="number" id="gridCols" value="2" min="1" max="4"><button data-inc="gridCols">+</button><span>colunas</span></div>
+              <span class="dim-x">×</span>
+              <div class="dim-ctrl"><button data-dec="gridRows">−</button><input type="number" id="gridRows" value="4" min="1" max="8"><button data-inc="gridRows">+</button><span>linhas</span></div>
+              <div class="grid-result"><span id="gridCalc">8</span> P2s</div>
+            </div>
+            <div class="grid-preview" id="gridPreview"></div>
+          </div>
+        </div>
+
+        <!-- STEP 4 -->
+        <div class="step" data-step="4">
+          <div class="step-eyebrow">PASSO 4 / 5</div>
+          <h2 class="step-title">Criativos &amp; imagens</h2>
+          <p class="step-help">Opcional. Gere prompts de imagem pro fluxo e prompts/criativos pros anúncios.</p>
+
+          <div class="toggle-card">
+            <label class="switch"><input type="checkbox" id="imagePrompts"><span class="slider"></span></label>
+            <div class="toggle-info"><b>🖼️ Prompts de imagem no fluxo</b><span>Um prompt pra cada card do onboard e da sequência</span></div>
+          </div>
+
+          <div class="toggle-card">
+            <label class="switch"><input type="checkbox" id="wantCreatives"><span class="slider"></span></label>
+            <div class="toggle-info"><b>🎨 Gerar criativos de anúncio</b><span>Prompts SVG ou pra plataformas de imagem</span></div>
+          </div>
+
+          <div id="creativeOpts" class="creative-opts hidden">
+            <div class="card-grid">
+              <div class="sel-card">
+                <label>Plataforma de geração</label>
+                <select id="creativePlatform"></select>
+              </div>
+              <div class="sel-card">
+                <label>Formato</label>
+                <select id="creativeSize"></select>
+              </div>
+              <div class="sel-card">
+                <label>Quantidade</label>
+                <div class="stepper-ctrl"><button data-dec="numCreatives">−</button><input type="number" id="numCreatives" value="20" min="1" max="40"><button data-inc="numCreatives">+</button></div>
+              </div>
+              <div class="sel-card">
+                <label class="switch-inline"><input type="checkbox" id="wantAudios"><span class="slider"></span> Áudios ElevenLabs v3</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 5 -->
+        <div class="step" data-step="5">
+          <div class="step-eyebrow">PASSO 5 / 5</div>
+          <h2 class="step-title">O que gerar?</h2>
+          <p class="step-help">Marque só o que precisa. Se já tem onboard e sequência prontos, desmarque e gere apenas o resto.</p>
+          <div class="block-pick" id="blockPick"></div>
+          <div class="summary" id="summary"></div>
         </div>
       </div>
-      <div class="field">
-        <label>Nº CRIATIVOS</label>
-        <input type="number" id="numCreatives" value="20" min="0" max="40">
+
+      <!-- nav -->
+      <div class="wizard-nav">
+        <button id="wizPrev" class="btn-ghost">← Voltar</button>
+        <button id="wizNext" class="btn-primary">Continuar →</button>
+        <button id="wizForge" class="btn-forge hidden">FORJAR FUNIL ⚡</button>
       </div>
     </div>
 
-    <div class="toggles">
-      <span class="toggles-title">BLOCOS A GERAR:</span>
-      <label class="chk"><input type="checkbox" data-block="page_name" checked> Nome de página</label>
-      <label class="chk"><input type="checkbox" data-block="onboard" checked> Onboard</label>
-      <label class="chk"><input type="checkbox" data-block="sequence" checked> Sequência</label>
-      <label class="chk"><input type="checkbox" data-block="grid" checked> Grid MIRB</label>
-      <label class="chk"><input type="checkbox" data-block="p1_titles" checked> Títulos P1</label>
-      <label class="chk"><input type="checkbox" data-block="p2_titles" checked> Títulos P2</label>
-      <label class="chk"><input type="checkbox" data-block="quiz" checked> Quiz Overlays</label>
-      <label class="chk"><input type="checkbox" data-block="meta_copy" checked> Copy Meta</label>
-      <label class="chk"><input type="checkbox" data-block="meta_onboard" checked> Onboard Meta</label>
-      <label class="chk"><input type="checkbox" data-block="creatives_prompt"> Prompt Criativos</label>
-      <label class="chk"><input type="checkbox" data-block="audios"> Áudios ElevenLabs</label>
-      <label class="chk special"><input type="checkbox" id="imagePrompts"> 🖼️ Prompts de imagem no fluxo</label>
+    <!-- ===== CLASSIC ===== -->
+    <div id="classic" class="classic hidden">
+      <div class="classic-grid" id="classicGrid"></div>
+      <button id="classicForge" class="btn-forge">FORJAR FUNIL ⚡</button>
     </div>
 
-    <div class="actions">
-      <button id="forgeBtn" class="forge-btn">FORJAR FUNIL ⚡</button>
-      <button id="saveBtn" class="ghost-btn hidden">💾 SALVAR NO HISTÓRICO</button>
-    </div>
-
+    <!-- ===== OUTPUT ===== -->
     <div id="output" class="output"></div>
+    <div class="output-actions hidden" id="outputActions">
+      <button id="saveBtn" class="btn-ghost">💾 Salvar no histórico</button>
+      <button id="downloadAll" class="btn-ghost">⬇️ Baixar todos os JSONs</button>
+    </div>
   </section>
 
-  <!-- ===== OTIMIZADOR ===== -->
-  <section id="tab-optimizer" class="panel hidden">
-    <div class="opt-head">
-      <p>Cole um onboard, sequência, grid ou copy existente (seu ou de terceiro). A IA devolve a versão otimizada completa.</p>
+  <!-- ============ OTIMIZADOR ============ -->
+  <section id="tab-optimizer" class="view hidden">
+    <div class="opt-hero">
+      <h2 class="step-title">Otimizador</h2>
+      <p class="step-help">Cole um onboard, sequência, grid ou copy — seu ou de terceiro. A IA devolve a versão turbinada.</p>
     </div>
-    <div class="config-grid">
-      <div class="field">
-        <label>TIPO DE CONTEÚDO</label>
+    <div class="card-grid">
+      <div class="sel-card">
+        <label>Tipo de conteúdo</label>
         <select id="optKind">
           <option value="onboard">Onboard (JSON)</option>
           <option value="sequência">Sequência (JSON)</option>
           <option value="grid">Grid MIRB (JSON)</option>
-          <option value="copy do Meta">Copy do Meta</option>
-          <option value="quiz overlay">Quiz Overlay</option>
+          <option value="copy do Meta">Copy do Meta (texto)</option>
+          <option value="quiz overlay">Quiz Overlay (texto)</option>
           <option value="outro">Outro</option>
         </select>
       </div>
-      <div class="field">
-        <label>PLATAFORMA (se JSON de chatbot)</label>
+      <div class="sel-card">
+        <label>Plataforma (se for JSON de chatbot)</label>
         <select id="optPlatform">
           <option value="">— não aplicável —</option>
           <option value="chatdrink">ChatDrink</option>
           <option value="chatfood">ChatFood</option>
         </select>
       </div>
-      <div class="field">
-        <label>MODELO IA</label>
-        <select id="optModel">
-          <option value="claude-sonnet-4-6">Sonnet 4.6</option>
-          <option value="claude-opus-4-8">Opus 4.8</option>
-          <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
-        </select>
+      <div class="sel-card">
+        <label>Modelo IA</label>
+        <select id="optModel" class="model-select"></select>
       </div>
     </div>
-    <div class="field">
-      <label>CONTEXTO / OBJETIVO (opcional)</label>
-      <input type="text" id="optContext" placeholder="ex: aumentar urgência, focar em público feminino, melhorar CTR">
+    <div class="full-field">
+      <label>Contexto / objetivo (opcional)</label>
+      <input type="text" id="optContext" placeholder="ex: aumentar urgência, focar público feminino, melhorar CTR">
     </div>
-    <div class="field">
-      <label>CONTEÚDO ORIGINAL</label>
-      <textarea id="optContent" rows="12" placeholder="Cole aqui o JSON ou texto a otimizar..."></textarea>
+    <div class="full-field">
+      <label>Conteúdo original</label>
+      <textarea id="optContent" rows="12" placeholder="Cole aqui o JSON ou texto..."></textarea>
     </div>
-    <div class="actions">
-      <button id="optBtn" class="forge-btn">OTIMIZAR 🔧</button>
-    </div>
+    <button id="optBtn" class="btn-forge">OTIMIZAR 🔧</button>
     <div id="optOutput" class="output"></div>
   </section>
 
-  <!-- ===== HISTÓRICO ===== -->
-  <section id="tab-history" class="panel hidden">
+  <!-- ============ HISTÓRICO ============ -->
+  <section id="tab-history" class="view hidden">
+    <h2 class="step-title">Histórico de funis</h2>
     <div id="historyList" class="history-list"></div>
   </section>
 
-  <footer class="foot">MBOLIVEIRAZ MEDIA &amp; TECH — CH4TB0T NEXUS v1.0</footer>
+  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v2.0 · <span id="modelFoot"></span></footer>
 </div>
 
-<!-- API KEY MODAL (modo local) -->
+<!-- ===== API KEY MODAL ===== -->
 <div id="keyModal" class="modal hidden">
   <div class="modal-box">
-    <h3>API KEY ANTHROPIC</h3>
-    <p>O servidor não tem chave configurada. Insira a sua (fica salva só no navegador).</p>
+    <div class="modal-icon">🔑</div>
+    <h3>API Key da Anthropic</h3>
+    <p>O servidor não tem chave configurada. Insira a sua — fica salva só neste navegador, nunca é enviada a terceiros.</p>
     <input type="password" id="userKey" placeholder="sk-ant-...">
-    <button id="saveKey">SALVAR</button>
+    <div class="modal-row">
+      <label class="model-pick"><span>Modelo padrão</span><select id="modelGlobal" class="model-select"></select></label>
+    </div>
+    <button id="saveKey" class="btn-primary">SALVAR E CONTINUAR</button>
   </div>
 </div>
+
+<!-- ===== TOAST ===== -->
+<div id="toast" class="toast"></div>
 
 <script src="app.js"></script>
 </body>

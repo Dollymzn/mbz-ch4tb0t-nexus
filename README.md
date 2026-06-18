@@ -1,80 +1,40 @@
-# MBZ::CH4TB0T NEXUS
+# MBZ::CH4TB0T NEXUS v2
 
-Gerador completo de funis de arbitragem digital (Meta Ads → Chatbot → Blog AdX) usando a **API do Claude**.
+Gerador completo de funis de arbitragem digital (Meta Ads -> Chatbot -> Blog AdX) via API do Claude. Interface cyberpunk com wizard passo-a-passo.
 
-Informe o nicho e os parâmetros → a ferramenta gera onboard, sequência, grid MIRB, títulos P1/P2, quiz overlays, copy do Meta, prompts de criativos e scripts de áudio — tudo pronto pra usar.
+## Novidades da v2
+- **Wizard passo-a-passo** (5 etapas) + botão de **modo clássico**.
+- **Saída sanitizada**: P1, P2, copy, quiz e áudios saem como texto limpo pra copiar e colar. Onboard, sequência e grid MIRB saem como **JSON com botão de download** (.json pronto pra importar).
+- **Sequência corrigida**: N sequências = N rotas, cada rota com a sequência COMPLETA (delay -> menu -> mensagem escalando), no formato exato do ChatDrink/ChatFood.
+- **Grid MIRB** no formato de importação oficial (version/grid/items) com CSS temático e !important.
+- **Card de prompts de imagem** do fluxo (onboard + sequência).
+- **Criativos configuráveis**: liga/desliga, escolhe plataforma (SVG Claude, DALL-E, Google Flow, Midjourney, Flux), formato (1080x1080, 1080x1440, 1080x1920) e quantidade.
+- **Sugestão de nome de página** baseada no nicho digitado (chips clicáveis).
+- **Tratamento de erro robusto**: retry automático + parsing tolerante (acabou o "upstream error is not valid JSON").
+- Histórico no Railway Volume, seletor de modelo, dois modos de API key.
 
----
-
-## Recursos
-
-- **Aba CRIADOR** — gera o funil completo do zero, bloco por bloco, com progresso visual.
-- **Aba OTIMIZADOR** — cole um onboard, sequência, grid ou copy existente e a IA devolve a versão otimizada.
-- **Aba HISTÓRICO** — funis salvos ficam guardados (Railway Volume) pra carregar depois.
-- **12 personas** + opção sem persona.
-- **11 idiomas** de fluxo e conteúdo (fluxo padrão en-US).
-- **7 moedas** locais.
-- **P1 personalizável** → gera 1 quiz overlay por P1.
-- **Grid personalizável** (colunas × linhas) → define automaticamente o nº de P2s.
-- **Rotas de onboard/sequência personalizáveis** (número e tipo).
-- **Toggle de prompts de imagem** pra cada passo do fluxo.
-- **CSS personalizado do MIRB grid** com `!important` conforme o tema/nicho.
-- **Seletor de plataforma** (ChatDrink / ChatFood) com aviso de formato.
-- **Seletor de modelo** da IA na interface.
-- Cada bloco é ativável individualmente (se você já tem onboard/sequência, gera só o que falta).
-
----
-
-## Dois modos de operação
-
-**Multiusuário (chave no servidor):** defina `ANTHROPIC_API_KEY` no Railway. Recomenda-se também `ACCESS_PASSWORD`.
-
-**Local (sem chave no servidor):** deixe `ANTHROPIC_API_KEY` vazia. Cada usuário insere a própria chave na interface (salva só no navegador).
-
----
-
-## Rodar localmente
-
+## Rodar local
 ```bash
 npm install
-# opcional: export ANTHROPIC_API_KEY=sua_chave
-# opcional: export ACCESS_PASSWORD=sua_senha
-npm start
+npm start   # http://localhost:3000
 ```
 
-Acesse `http://localhost:3000`.
-
----
-
-## Deploy no Railway
-
-1. Suba pro GitHub (o `.gitignore` exclui `node_modules`, `.env` e os JSONs de dados).
-2. [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**.
-3. Em **Variables**, adicione:
-   - `ANTHROPIC_API_KEY` = sua chave (modo multiusuário) — ou deixe vazia (modo local)
-   - `ACCESS_PASSWORD` = uma senha (recomendado)
-   - `DATA_DIR` = `/data` (pra persistir o histórico)
-4. **Settings → Volumes** → crie um volume e monte em `/data`.
-5. **Settings → Networking → Generate Domain** pra URL pública.
-
-> Sem o volume, o histórico é apagado a cada redeploy. Com o volume montado em `/data` e `DATA_DIR=/data`, ele persiste.
-
----
+## Deploy Railway
+1. GitHub -> Railway -> Deploy from repo.
+2. Variables: `ANTHROPIC_API_KEY` (ou vazio p/ modo local), `ACCESS_PASSWORD`, `DATA_DIR=/data`.
+3. Settings -> Volumes -> montar em `/data`.
+4. Generate Domain.
 
 ## Estrutura
-
 ```
 chatbot-nexus/
-├── server.js        # Express + Claude API + histórico
-├── prompts.js       # System prompt, personas, idiomas, formatos ChatDrink/ChatFood
-├── package.json
-├── .env.example
-└── public/
-    ├── index.html
-    ├── style.css    # UI cyberpunk
-    └── app.js       # lógica do frontend
+├── server.js     # Express + Claude API (retry + parsing robusto) + histórico
+├── prompts.js    # system prompt, personas, idiomas, formatos ChatDrink/ChatFood, criativos
+├── public/
+│   ├── index.html  # wizard + clássico + otimizador + histórico
+│   ├── style.css   # UI cyberpunk premium
+│   └── app.js      # wizard, sanitização, download JSON, particles
+└── .env.example
 ```
-
----
 
 MBOLIVEIRAZ MEDIA & TECH
