@@ -100,7 +100,87 @@ function extractJSON(text) {
   return null;
 }
 
-// ---- GERAÇÃO ----
+// ---- Pós-processa onboard ChatDrink: corrige random, redirects e UTM ----
+function fixOnboardChatdrink(j, nslug) {
+  if (!j || !Array.isArray(j.routes)) return j;
+  const routes = j.routes;
+  const n = routes.length;
+  if (n < 2) return j;
+  const lastIdx = n - 1;
+  // indices de conteudo = 1..lastIdx-1
+  const contentIdx = [];
+  for (let i = 1; i < lastIdx; i++) contentIdx.push(i);
+  // 1) random na rota 0
+  if (routes[0] && Array.isArray(routes[0].interactions)) {
+    const r = routes[0].interactions.find(x => x.type === 'random');
+    if (r) r.config = { routes: contentIdx.slice() };
+  }
+  // 2) cada rota de conteudo: redirect pra ultima + utm_content onbN
+  contentIdx.forEach((idx, k) => {
+    const route = routes[idx];
+    if (!route || !Array.isArray(route.interactions)) return;
+    const num = k + 1;
+    route.interactions.forEach(it => {
+      if (it.type === 'menu' && it.config) {
+        it.config.redirect_type = 'route';
+        it.config.redirect_target = lastIdx;
+        (it.config.cards || []).forEach(c => fixButtonsUtm(c.buttons, 'onboard', 'onb' + num + '-' + nslug));
+      }
+      if (it.type === 'botoes' && it.config) {
+        it.config.redirect_type = 'route';
+        it.config.redirect_target = lastIdx;
+        fixButtonsUtm(it.config.buttons, 'onboard', 'onb' + num + '-' + nslug);
+      }
+    });
+  });
+  return j;
+}
+
+// ---- Pós-processa sequência ChatDrink: random, fallback, quick_replies ----
+function fixSequenceChatdrink(j, nslug) {
+  if (!j || !Array.isArray(j.routes)) return j;
+  const routes = j.routes;
+  const n = routes.length;
+  if (n < 3) return j;
+  const fbIdx = n - 1; // ultima = fallback
+  const contentIdx = [];
+  for (let i = 1; i < fbIdx; i++) contentIdx.push(i);
+  // random aponta so pras de conteudo
+  if (routes[0] && Array.isArray(routes[0].interactions)) {
+    const r = routes[0].interactions.find(x => x.type === 'random');
+    if (r) r.config = { routes: contentIdx.slice() };
+  }
+  // conteudo: quick_replies -> fallback; utm seqN
+  contentIdx.forEach((idx, k) => {
+    const route = routes[idx];
+    if (!route || !Array.isArray(route.interactions)) return;
+    const num = k + 1;
+    route.interactions.forEach(it => {
+      if (it.type === 'menu' && it.config) (it.config.cards || []).forEach(c => fixButtonsUtm(c.buttons, 'sequence', 'seq' + num + '-' + nslug));
+      if (it.type === 'mensagem' && it.config && Array.isArray(it.config.quick_replies)) {
+        it.config.quick_replies.forEach(q => { q.action_type = 'route'; q.target_route = fbIdx; q.target_flow = ''; });
+      }
+    });
+  });
+  // fallback utm seqf
+  const fb = routes[fbIdx];
+  if (fb && Array.isArray(fb.interactions)) {
+    fb.interactions.forEach(it => { if (it.type === 'botoes' && it.config) fixButtonsUtm(it.config.buttons, 'sequence', 'seqf-' + nslug); });
+  }
+  return j;
+}
+
+function fixButtonsUtm(buttons, src, content) {
+  if (!Array.isArray(buttons)) return;
+  buttons.forEach(b => {
+    const url = '{{URL_REDIR}}?utm_source=' + src + '&utm_campaign={{UTM_CAMPAIGN}}&utm_medium={{NOMEDAPAGINA}}&utm_term=' + src + '&utm_content=' + content;
+    if (b.action_type === 'url') {
+      b.url = url;
+      if (Array.isArray(b.urls)) b.urls = [{ url: url, weight: 100 }];
+      else b.urls = [{ url: url, weight: 100 }];
+    }
+  });
+}
 app.post('/api/generate', async (req, res) => {
   try {
     if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
@@ -115,8 +195,14 @@ app.post('/api/generate', async (req, res) => {
     const text = await callClaude(apiKey, model, system, userMsg, heavy ? 20000 : 7000);
 
     const json = extractJSON(text);
-    // formato: { raw, json, kind } — frontend decide como exibir/baixar
-    res.json({ block, raw: text, json: json, ok: true });
+    // pós-processa estrutura determinística (random, redirects, utm, fallback)
+    const nslug = (params.niche || 'nicho').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 20);
+    let fixedJson = json;
+    if (json && (params.platform || 'chatdrink') === 'chatdrink') {
+      if (block === 'onboard') fixedJson = fixOnboardChatdrink(json, nslug);
+      else if (block === 'sequence') fixedJson = fixSequenceChatdrink(json, nslug);
+    }
+    res.json({ block, raw: fixedJson ? JSON.stringify(fixedJson, null, 2) : text, json: fixedJson, ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -187,33 +273,38 @@ SLUG: ${nslug}`;
     case 'page_name':
       return `${ctx}\nGere 6 nomes de pagina de Facebook que pareçam PESSOAS REAIS adequadas ESPECIFICAMENTE ao nicho "${p.niche}". Devem combinar com o tema do nicho. Responda JSON: {"names":["Nome Sobrenome", ...]}`;
 
-    case 'onboard':
+    case 'onboard': {
+      const nr = p.onboardRoutes || 7;
+      const lastId = nr + 1; // route_0 random + nr conteudo + 1 goto => ultima e route_(nr+1)
+      const typeInstr = p.onboardRouteType && p.onboardRouteType.indexOf('boto') >= 0 ? 'TODAS botoes'
+        : p.onboardRouteType && p.onboardRouteType.indexOf('misto') >= 0 ? 'ALTERNE entre menu e botoes'
+        : 'TODAS menu';
       return `${ctx}
-Gere o ONBOARD completo na plataforma ${p.platform}.
-Numero de rotas de CONTEUDO: ${p.onboardRoutes || 7} (alem da rota 0 random e da ultima rota goto).
-Tipo das rotas: ${p.onboardRouteType || 'menu'} (menu=card com imagem, botoes=texto+botao, misto=alterne entre os dois).
-Idioma do fluxo: ${p.flowLang || 'en-US'}. Persona: ${p.personaLabel}.
-
-ESTRUTURA OBRIGATORIA (ChatDrink):
-1) routes[0]: SO random. interactions:[{type:"random",config:{routes:[]},sort_order:0}]
-2) routes[1..${p.onboardRoutes || 7}]: cada uma ISOLADA com EXATAMENTE [digitando, ${p.onboardRouteType && p.onboardRouteType.indexOf('boto') >= 0 ? 'botoes' : p.onboardRouteType && p.onboardRouteType.indexOf('misto') >= 0 ? '(menu ou botoes alternando)' : 'menu'}]. Cada uma redireciona com redirect_type:"route" e redirect_target:9999 (placeholder da ultima rota). SEM mensagem, SEM quick_replies.
-3) ultima rota (route_${(p.onboardRoutes || 7) + 1}): SO goto, nada mais. config:{target_type:"flow",target_route:"",target_flow:"433"}
-Total de rotas no array: ${(p.onboardRoutes || 7) + 2} (1 random + ${p.onboardRoutes || 7} conteudo + 1 goto).
-A copy de cada rota deve ser unica e persuasiva pro nicho. image_url use "https://via.placeholder.com/1200x628".
-Responda APENAS o JSON do flow, valido e completo, sem markdown.`;
+Gere o ONBOARD ChatDrink com ${nr} rotas de CONTEUDO.
+Estrutura: routes[0]=random; routes[1..${nr}]=conteudo isolado [digitando, ${typeInstr === 'TODAS botoes' ? 'botoes' : typeInstr === 'ALTERNE entre menu e botoes' ? 'menu ou botoes' : 'menu'}]; ultima rota route_${lastId}=so goto.
+Tipo das rotas de conteudo: ${typeInstr}.
+Cada rota de conteudo: digitando(duration:3) + ${typeInstr === 'TODAS botoes' ? 'botoes' : 'menu/botoes'} com redirect_type:"route", redirect_target:${lastId}. SEM mensagem, SEM quick_replies.
+IMPORTANTE NOS LINKS: o utm_content de cada rota deve ser onbN-${(p.niche || 'nicho').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 20)} onde N e o numero da rota (rota 1 = onb1, rota 2 = onb2, etc). Cada rota tem seu numero unico.
+routes[0] random: interactions:[{type:"random",config:{routes:[1,2,...,${nr}]},sort_order:0}] (liste os indices 1 a ${nr}).
+ultima rota: interactions:[{type:"goto",config:{target_type:"flow",target_route:"",target_flow:"433"},sort_order:0}].
+image_url use "https://via.placeholder.com/1200x628". Copy unica e persuasiva por rota, idioma ${p.flowLang || 'en-US'}, persona ${p.personaLabel}.
+Responda APENAS o JSON valido e completo, sem markdown.`;
+    }
 
     case 'sequence': {
       const nseq = p.seqRoutes || 3;
-      // adapta trios por rota pra caber no orcamento de tokens e nao truncar
       const trios = nseq <= 2 ? 9 : nseq <= 4 ? 7 : nseq <= 6 ? 5 : 4;
+      const fbId = nseq + 1; // route_0 random + nseq conteudo + 1 fallback => fallback e route_(nseq+1)
+      const nslug = (p.niche || 'nicho').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 20);
       return `${ctx}
-Gere a SEQUENCIA completa na plataforma ${p.platform}.
-O usuario quer ${nseq} SEQUENCIAS = ${nseq} ROTAS de conteudo (route_1 ... route_${nseq}). CADA rota e UMA SEQUENCIA COMPLETA: um unico array "interactions" com ${trios} trios escalando no tempo: delay -> menu -> mensagem(com quick_reply) repetidos ${trios}x. NUNCA faça uma rota por mensagem.
-routes[0] = SO random apontando pra todas: interactions:[{type:"random",config:{routes:[]},sort_order:0}].
-Delays escalam dentro de cada rota: 3min, 5min, 10min, 15min, 30min, 1h, 2h, 3h.
-Cada trio: menu (card com imagem "https://via.placeholder.com/1200x628" + botao pro blog) + mensagem (texto curto da persona ${p.personaLabel} + 1 quick_reply pra fallback com target_route:9999). Varie o angulo de urgencia/storytelling entre as ${nseq} rotas.
-Idioma do fluxo: ${p.flowLang || 'en-US'}.
-CRITICO: gere JSON 100% VALIDO e COMPLETO. Feche TODAS as chaves e colchetes. Seja conciso nos textos (1-2 frases) pra nao truncar. Responda APENAS o JSON, sem markdown, sem crases.`;
+Gere a SEQUENCIA ChatDrink. ${nseq} SEQUENCIAS = ${nseq} ROTAS de conteudo (route_1..route_${nseq}) + 1 ROTA FALLBACK (route_${fbId}).
+Cada rota de conteudo = UMA jornada COMPLETA: array "interactions" com ${trios} trios escalando: delay -> menu -> mensagem(com 1 quick_reply) repetidos ${trios}x. NUNCA uma rota por mensagem.
+routes[0] random: interactions:[{type:"random",config:{routes:[1,2,...,${nseq}]},sort_order:0}] (liste indices 1 a ${nseq}, SEM incluir o fallback).
+Delays escalam dentro de cada rota: 3min,5min,10min,15min,30min,1h,2h,3h.
+Cada trio: menu (card imagem "https://via.placeholder.com/1200x628" + botao, utm_content=seq${'{N}'}-${nslug}) + mensagem (texto curto persona ${p.personaLabel} + 1 quick_reply com action_type:"route", target_route:${fbId} apontando pro FALLBACK).
+ROTA FALLBACK (route_${fbId}, name:"Rota ${fbId + 1} - Fallback"): UM unico "botoes" com title persuasivo, 1 botao action_type:"url" url com utm_content=seqf-${nslug}, redirect_type:"", redirect_target:"". NADA de delay/menu/mensagem nela.
+Idioma ${p.flowLang || 'en-US'}.
+CRITICO: JSON 100% VALIDO e COMPLETO. Feche TODAS as chaves. Textos concisos (1-2 frases) pra nao truncar. Responda APENAS o JSON, sem markdown.`;
     }
 
     case 'grid_preview':
@@ -229,7 +320,12 @@ Grid: ${p.gridCols} colunas. Total de itens: ${p.gridCols * p.gridRows}.
 Idioma do conteudo: ${p.contentLang}. ${p.currency !== 'USD' ? 'Moeda ' + p.currency + ' se citar valores.' : ''}
 ${p.gridDirection ? 'USE esta direcao visual aprovada: ' + JSON.stringify(p.gridDirection) : ''}
 CSS personalizado combinando com o tema, TODAS as regras com !important. Classes: .mirb-grid-container .mirb-grid-title .mirb-grid-subtitle .mirb-grid-item .mirb-grid-item:hover .mirb-grid-item-title .mirb-grid-footer .mirb-grid-footer-line .mirb-grid-footer-highlight.
-REGRA CRITICA DE LEGIBILIDADE (NAO IGNORE): os titulos dos itens (.mirb-grid-item-title) e o titulo (.mirb-grid-title) precisam de ALTO CONTRASTE e fonte marcante. Use font-weight 700-800, font-family forte (Georgia/Poppins/Montserrat/Arial Black), e font-size >= 16px. NADA de texto apagado, cinza claro sobre branco, ou cor fraca. O texto deve SALTAR aos olhos. Se o fundo do item for claro, texto escuro forte; se escuro, texto claro vibrante. Adicione text-shadow sutil pra reforcar.
+REGRA CRITICA DE LEGIBILIDADE (NAO IGNORE):
+- .mirb-grid-title: fonte marcante (Georgia/Poppins/Montserrat/Arial Black), font-weight 800, font-size >= 26px, cor vibrante de alto contraste, text-shadow forte. DEVE ter um fundo proprio OU text-shadow espesso pra destacar do fundo da pagina.
+- .mirb-grid-subtitle: NUNCA apagado/transparente. font-size >= 16px, font-weight 600, cor LEGIVEL (nao cinza claro fraco). Contraste forte.
+- .mirb-grid-item-title: font-weight 700-800, font-size >= 16px. Se fundo claro -> texto escuro forte; se escuro -> texto claro vibrante. text-shadow sutil.
+- .mirb-grid-container e .mirb-grid-footer: devem ter FUNDO solido ou gradiente (nunca transparente deixando o texto sumir).
+O texto inteiro do grid deve SALTAR aos olhos, legivel em qualquer fundo de blog. Nada apagado, nada sem fundo.
 Para cada item, item_image = string de busca do Pinterest em INGLES.
 Responda EXATAMENTE neste formato JSON:
 {"version":"1.2.2","export_date":"<data>","grid":{"grid_name":"<nome curto>","title":"<titulo no idioma do conteudo>","subtitle":"<subtitulo curto>","columns":"${p.gridCols}","global_link":"","use_global_link":"0","custom_css":"<css com !important e fontes legiveis>","footer_text_1":"<texto>","footer_text_2":"GRATIS!"},"items":[{"item_title":"<LABEL>","item_image":"<pinterest search EN>","item_link":"","item_order":"0"}]}
