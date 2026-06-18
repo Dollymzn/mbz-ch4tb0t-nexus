@@ -98,6 +98,11 @@
               <select id="contentLang"></select>
               <small>P1, P2, grid e quiz</small>
             </div>
+            <div class="sel-card" style="border-color:var(--green)">
+              <label style="color:var(--green)">🎯 Idioma da campanha (GEO)</label>
+              <select id="campaignLang"></select>
+              <small>País-alvo · copy e onboard do Meta</small>
+            </div>
             <div class="sel-card">
               <label>💰 Moeda local</label>
               <select id="currency"></select>
@@ -274,8 +279,8 @@
       <input type="text" id="optContext" placeholder="ex: aumentar urgência, focar público feminino, melhorar CTR">
     </div>
     <div class="full-field">
-      <label>Conteúdo original</label>
-      <textarea id="optContent" rows="12" placeholder="Cole aqui o JSON ou texto..."></textarea>
+      <label>Conteúdo original <button id="optUpload" class="btn-ghost-sm" style="margin-left:8px">📁 Carregar .json</button><input type="file" id="optFile" accept=".json,.txt" style="display:none"></label>
+      <textarea id="optContent" rows="12" placeholder="Cole aqui o JSON ou texto... ou carregue um arquivo"></textarea>
     </div>
     <button id="optBtn" class="btn-forge">OTIMIZAR 🔧</button>
     <div id="optOutput" class="output"></div>

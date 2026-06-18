@@ -50,6 +50,7 @@ function loadConfig(){
     CFG=cfg;
     fillSel('#flowLang',cfg.languages,'id','label','en-US');
     fillSel('#contentLang',cfg.languages,'id','label','pt-BR');
+    fillSel('#campaignLang',cfg.languages,'id','label','pt-BR');
     fillSel('#currency',cfg.currencies,'id','label','USD');
     fillSel('#persona',cfg.personas,'id','label','sem_persona');
     fillSel('#creativePlatform',cfg.creativePlatforms,'id','label','svg_claude');
@@ -219,7 +220,7 @@ function collectParams(){
   var ps=$('#persona');
   lastParams={
     niche:$('#niche').value.trim(),pageName:$('#pageName').value.trim(),
-    flowLang:$('#flowLang').value,contentLang:$('#contentLang').value,currency:$('#currency').value,
+    flowLang:$('#flowLang').value,contentLang:$('#contentLang').value,campaignLang:$('#campaignLang').value,currency:$('#currency').value,
     persona:ps.value,personaLabel:ps.options[ps.selectedIndex].text,
     platform:document.querySelector('input[name=platform]:checked').value,
     onboardRoutes:+$('#onboardRoutes').value,onboardRouteType:$('#onboardRouteType').value,
@@ -237,7 +238,7 @@ function runForge(){
   if(!lastParams.niche){toast('Digite o nicho.');gotoStep(1);return}
   if(!CFG.serverKey&&!USER_KEY){$('#keyModal').classList.remove('hidden');return}
   var blocks=selectedBlocks();if(!blocks.length){toast('Marque ao menos um bloco.');return}
-  var out=$('#output');out.innerHTML='';lastBlocks={};delete lastParams.gridDirection;
+  var out=$('#output');out.innerHTML='';lastBlocks={};delete lastParams.gridDirection;delete lastParams.onboardMenuCount;delete lastParams.seqMenuCount;
   $('#wizForge').disabled=true;$('#classicForge').disabled=true;$('#outputActions').classList.add('hidden');
   blocks.forEach(function(b){out.appendChild(makeCard(b))});
   out.scrollIntoView({behavior:'smooth',block:'start'});
@@ -263,9 +264,25 @@ function genBlock(b,done){
   fetch('/api/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({block:b,params:lastParams,model:MODEL})})
   .then(function(r){return r.json()}).then(function(res){
     if(res.error){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(res.error)+'</pre>')}
-    else{lastBlocks[b]={raw:res.raw,json:res.json};setStatus(b,'done');renderBlock(b,res)}
+    else{
+      lastBlocks[b]={raw:res.raw,json:res.json};setStatus(b,'done');renderBlock(b,res);
+      // conta menus pra alimentar os prompts de imagem
+      if(b==='onboard'&&res.json)lastParams.onboardMenuCount=countMenus(res.json);
+      if(b==='sequence'&&res.json)lastParams.seqMenuCount=countMenus(res.json);
+    }
     done();
   }).catch(function(err){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(err.message)+'</pre>');done()});
+}
+function countMenus(flow){
+  var n=0;
+  try{
+    if(flow.routes){ // chatdrink
+      flow.routes.forEach(function(r){(r.interactions||[]).forEach(function(it){if(it.type==='menu')n++})});
+    }else{ // chatfood
+      Object.keys(flow).forEach(function(k){var msgs=(flow[k]&&flow[k].MESSAGES)||[];msgs.forEach(function(m){if(m.type==='simple_menu')n++})});
+    }
+  }catch(e){}
+  return n;
 }
 function showGridDirection(b,dir){
   var sw=(dir.palette||[]).map(function(c){return '<span style="display:inline-block;width:22px;height:22px;border-radius:5px;background:'+esc(c)+';margin-right:6px;vertical-align:middle;border:1px solid #333"></span>'}).join('');
@@ -437,6 +454,14 @@ function loadEntry(h){
 
 /* ---------- optimizer ---------- */
 function wireOptimizer(){
+  // upload de arquivo
+  $('#optUpload').onclick=function(e){e.preventDefault();$('#optFile').click()};
+  $('#optFile').onchange=function(){
+    var f=this.files[0];if(!f)return;
+    var rd=new FileReader();
+    rd.onload=function(){$('#optContent').value=rd.result;toast('Arquivo carregado: '+f.name)};
+    rd.readAsText(f);
+  };
   $('#optBtn').onclick=function(){
     var content=$('#optContent').value.trim();if(!content){toast('Cole o conteúdo.');return}
     if(!CFG.serverKey&&!USER_KEY){$('#keyModal').classList.remove('hidden');return}

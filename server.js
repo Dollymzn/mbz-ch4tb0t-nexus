@@ -227,7 +227,7 @@ ${isJsonKind ? 'Devolva APENAS JSON valido completo pronto pra importar.' : 'Dev
 
 CONTEUDO ORIGINAL:
 ${content}`;
-    const text = await callClaude(apiKey, model, system, userMsg, 16000);
+    const text = await callClaude(apiKey, model, system, userMsg, 24000);
     const json = isJsonKind ? extractJSON(text) : null;
     res.json({ raw: text, json: json, isJson: isJsonKind, ok: true });
   } catch (e) {
@@ -263,6 +263,7 @@ function buildBlockPrompt(block, p) {
 NICHO: ${p.niche}
 IDIOMA DO FLUXO (chatbot): ${p.flowLang || 'en-US'}
 IDIOMA DO CONTEUDO (blog): ${p.contentLang || 'pt-BR'}
+IDIOMA DA CAMPANHA (Meta/GEO alvo): ${p.campaignLang || p.contentLang || 'pt-BR'}
 MOEDA: ${p.currency || 'USD'}
 PERSONA: ${p.personaLabel || 'sem persona'}
 NOME DA PAGINA FB: ${p.pageName || '(sugira)'}
@@ -293,18 +294,19 @@ Responda APENAS o JSON valido e completo, sem markdown.`;
 
     case 'sequence': {
       const nseq = p.seqRoutes || 3;
-      const trios = nseq <= 2 ? 9 : nseq <= 4 ? 7 : nseq <= 6 ? 5 : 4;
-      const fbId = nseq + 1; // route_0 random + nseq conteudo + 1 fallback => fallback e route_(nseq+1)
+      const trios = nseq <= 2 ? 10 : nseq <= 4 ? 8 : nseq <= 6 ? 6 : 5;
+      const fbId = nseq + 1;
       const nslug = (p.niche || 'nicho').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 20);
       return `${ctx}
 Gere a SEQUENCIA ChatDrink. ${nseq} SEQUENCIAS = ${nseq} ROTAS de conteudo (route_1..route_${nseq}) + 1 ROTA FALLBACK (route_${fbId}).
-Cada rota de conteudo = UMA jornada COMPLETA: array "interactions" com ${trios} trios escalando: delay -> menu -> mensagem(com 1 quick_reply) repetidos ${trios}x. NUNCA uma rota por mensagem.
-routes[0] random: interactions:[{type:"random",config:{routes:[1,2,...,${nseq}]},sort_order:0}] (liste indices 1 a ${nseq}, SEM incluir o fallback).
-Delays escalam dentro de cada rota: 3min,5min,10min,15min,30min,1h,2h,3h.
-Cada trio: menu (card imagem "https://via.placeholder.com/1200x628" + botao, utm_content=seq${'{N}'}-${nslug}) + mensagem (texto curto persona ${p.personaLabel} + 1 quick_reply com action_type:"route", target_route:${fbId} apontando pro FALLBACK).
-ROTA FALLBACK (route_${fbId}, name:"Rota ${fbId + 1} - Fallback"): UM unico "botoes" com title persuasivo, 1 botao action_type:"url" url com utm_content=seqf-${nslug}, redirect_type:"", redirect_target:"". NADA de delay/menu/mensagem nela.
+Cada rota de conteudo = UMA jornada COMPLETA: array "interactions" com trios escalando: delay -> menu -> mensagem(com 1 quick_reply). NUNCA uma rota por mensagem.
+LIBERDADE CRIATIVA: cada rota deve ter NO MINIMO 7 trios (menu+mensagem). Voce PODE e DEVE variar a quantidade entre as rotas — uma pode ter 7, outra 9, outra 11. Mire em torno de ${trios} mas varie de verdade pra cada rota ser diferente.
+DELAYS UNICOS POR ROTA (CRITICO): NAO repita a mesma sequencia de delays entre rotas diferentes. Cada rota tem seu proprio ritmo. Ex rota 1: 3min,8min,15min,30min,1h,2h,4h... | rota 2: 5min,10min,20min,45min,1h30,3h,5h... | rota 3: 2min,7min,12min,25min,50min,1h30,3h... Misture minutos e horas de forma unica em cada rota. NUNCA todas com os mesmos numeros.
+routes[0] random: interactions:[{type:"random",config:{routes:[1,2,...,${nseq}]},sort_order:0}] (indices 1 a ${nseq}, SEM o fallback).
+Cada trio: menu (card imagem "https://via.placeholder.com/1200x628" + botao) + mensagem (texto curto persona ${p.personaLabel} + 1 quick_reply action_type:"route" target_route:${fbId}).
+ROTA FALLBACK (route_${fbId}, name:"Rota ${fbId + 1} - Fallback"): UM unico "botoes", title persuasivo, 1 botao url, redirect_type:"", redirect_target:"". NADA de delay/menu/mensagem.
 Idioma ${p.flowLang || 'en-US'}.
-CRITICO: JSON 100% VALIDO e COMPLETO. Feche TODAS as chaves. Textos concisos (1-2 frases) pra nao truncar. Responda APENAS o JSON, sem markdown.`;
+CRITICO: JSON 100% VALIDO e COMPLETO. Feche TODAS as chaves. Textos concisos (1-2 frases). Responda APENAS o JSON, sem markdown.`;
     }
 
     case 'grid_preview':
@@ -345,17 +347,21 @@ Cada quiz: pergunta, opcoes (3-4; se visual incluir pinterest EN por opcao), loa
 Responda JSON: {"quizzes":[{"p1_index":1,"type":"texto","question":"","options":[{"label":"","pinterest":""}],"loading":"","final_title":"","cta":"","note":""}]}`;
 
     case 'meta_copy':
-      return `${ctx}\nGere copy do Meta Ads no idioma ${p.contentLang} usando moeda ${p.currency}: 5 textos principais (clickbait, emojis, quebras), 5 titulos curtos, 1 descricao.\nResponda JSON: {"primary_texts":["..."],"headlines":["..."],"description":"..."}`;
+      return `${ctx}\nGere copy do Meta Ads no IDIOMA DA CAMPANHA (${p.campaignLang || p.contentLang || 'pt-BR'}) usando moeda ${p.currency}: 5 textos principais (clickbait, emojis, quebras), 5 titulos curtos, 1 descricao. A copy DEVE estar no idioma da campanha (GEO alvo), nao no idioma do blog.\nResponda JSON: {"primary_texts":["..."],"headlines":["..."],"description":"..."}`;
 
     case 'meta_onboard':
-      return `${ctx}\nGere o onboard do Meta (entrada do chatbot) no idioma ${p.flowLang || 'en-US'}: 1 boas-vindas, 5 quick replies curtas com emoji, 1 follow-up 24h.\nResponda JSON: {"welcome":"...","quick_replies":["..."],"followup":"..."}`;
+      return `${ctx}\nGere o onboard do Meta (entrada do chatbot) no IDIOMA DA CAMPANHA (${p.campaignLang || p.contentLang || 'pt-BR'}): 1 boas-vindas, 5 quick replies curtas com emoji, 1 follow-up 24h. DEVE estar no idioma da campanha (GEO alvo).\nResponda JSON: {"welcome":"...","quick_replies":["..."],"followup":"..."}`;
 
-    case 'image_prompts':
+    case 'image_prompts': {
+      const onbMenus = p.onboardMenuCount != null ? p.onboardMenuCount : (p.onboardRoutes || 7);
+      const seqMenus = p.seqMenuCount != null ? p.seqMenuCount : (p.seqRoutes || 3) * 7;
       return `${ctx}
-Gere prompts de geracao de imagem (em INGLES) para CADA passo visual do fluxo do chatbot.
-Considere ${p.onboardRoutes || 7} cards de onboard e ${p.seqRoutes || 3} sequencias com ~8 cards cada.
-Cada prompt deve ser pronto pra DALL-E/Flux/Google Flow, descritivo, fotografico ou ilustrativo conforme o nicho "${p.niche}", vertical.
-Responda JSON: {"onboard":[{"step":"onb1","prompt":"..."}],"sequence":[{"route":1,"step":"seq1-card1","prompt":"..."}]}`;
+Gere prompts de geracao de imagem (em INGLES) APENAS para os cards/menus que existem no fluxo.
+ONBOARD: exatamente ${onbMenus} prompts (um por card de menu — botoes nao tem imagem).
+SEQUENCIA: exatamente ${seqMenus} prompts (um por card de menu de todas as rotas somadas).
+Cada prompt pronto pra DALL-E/Flux/Google Flow, descritivo, fotografico ou ilustrativo conforme o nicho "${p.niche}", vertical.
+Responda JSON: {"onboard":[{"step":"onb1","prompt":"..."}],"sequence":[{"route":1,"step":"seq1-card1","prompt":"..."}]} com exatamente ${onbMenus} itens em onboard e ${seqMenus} em sequence.`;
+    }
 
     case 'creatives_prompt': {
       const plat = p.creativePlatform || 'svg_claude';
