@@ -238,7 +238,7 @@ function runForge(){
   if(!lastParams.niche){toast('Digite o nicho.');gotoStep(1);return}
   if(!CFG.serverKey&&!USER_KEY){$('#keyModal').classList.remove('hidden');return}
   var blocks=selectedBlocks();if(!blocks.length){toast('Marque ao menos um bloco.');return}
-  var out=$('#output');out.innerHTML='';lastBlocks={};delete lastParams.gridDirection;delete lastParams.onboardMenuCount;delete lastParams.seqMenuCount;
+  var out=$('#output');out.innerHTML='';lastBlocks={};delete lastParams.gridDirection;delete lastParams.onboardMenuCount;delete lastParams.seqMenuCount;delete lastParams.onboardMenuMap;delete lastParams.seqMenuMap;
   $('#wizForge').disabled=true;$('#classicForge').disabled=true;$('#outputActions').classList.add('hidden');
   blocks.forEach(function(b){out.appendChild(makeCard(b))});
   out.scrollIntoView({behavior:'smooth',block:'start'});
@@ -267,8 +267,8 @@ function genBlock(b,done){
     else{
       lastBlocks[b]={raw:res.raw,json:res.json};setStatus(b,'done');renderBlock(b,res);
       // conta menus pra alimentar os prompts de imagem
-      if(b==='onboard'&&res.json)lastParams.onboardMenuCount=countMenus(res.json);
-      if(b==='sequence'&&res.json)lastParams.seqMenuCount=countMenus(res.json);
+      if(b==='onboard'&&res.json){var om=menuBreakdown(res.json);lastParams.onboardMenuCount=om.total;lastParams.onboardMenuMap=om.map}
+      if(b==='sequence'&&res.json){var sm=menuBreakdown(res.json);lastParams.seqMenuCount=sm.total;lastParams.seqMenuMap=sm.map}
     }
     done();
   }).catch(function(err){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(err.message)+'</pre>');done()});
@@ -284,13 +284,46 @@ function countMenus(flow){
   }catch(e){}
   return n;
 }
+// retorna {total, map:[{route:N,menus:M}]} contando menus por rota
+function menuBreakdown(flow){
+  var total=0,map=[];
+  try{
+    if(flow.routes){ // chatdrink: rota 0 e random; conteudo de 1 em diante
+      flow.routes.forEach(function(r,idx){
+        var c=0;(r.interactions||[]).forEach(function(it){if(it.type==='menu')c++});
+        if(c>0){map.push({route:idx,menus:c});total+=c}
+      });
+    }else{ // chatfood
+      var ri=0;Object.keys(flow).forEach(function(k){
+        if(k==='WELCOME')return;ri++;
+        var c=0;((flow[k]&&flow[k].MESSAGES)||[]).forEach(function(m){if(m.type==='simple_menu')c++});
+        if(c>0){map.push({route:ri,menus:c});total+=c}
+      });
+    }
+  }catch(e){}
+  return {total:total,map:map};
+}
 function showGridDirection(b,dir){
-  var sw=(dir.palette||[]).map(function(c){return '<span style="display:inline-block;width:22px;height:22px;border-radius:5px;background:'+esc(c)+';margin-right:6px;vertical-align:middle;border:1px solid #333"></span>'}).join('');
-  var html='<div class="clean-view"><span class="tag">DIREÇÃO VISUAL</span>'+
-    '<p>'+sw+'</p>'+
-    '<p><b>Fonte:</b> '+esc(dir.font||'')+'</p>'+
-    '<p style="background:'+esc(dir.item_bg||'#222')+';color:'+esc(dir.item_text_color||'#fff')+';padding:10px 16px;border-radius:8px;font-family:'+esc(dir.font||'Georgia')+';font-weight:700;display:inline-block">Exemplo de título do item</p>'+
-    '<p style="margin-top:10px;color:var(--muted)">'+esc(dir.mood||'')+'</p></div>';
+  var pal=(dir.palette||[]);
+  var sw=pal.map(function(c){return '<span style="display:inline-block;width:26px;height:26px;border-radius:6px;background:'+esc(c)+';margin-right:6px;vertical-align:middle;border:1px solid rgba(255,255,255,.2)"></span>'}).join('');
+  var titleColor=dir.title_color||'#fff';
+  var itemBg=dir.item_bg||'#1a1a2e';
+  var itemText=dir.item_text_color||'#fff';
+  var font=dir.font||'Georgia';
+  var accent=pal[0]||'#c084fc';
+  // mini-mockup renderizado do grid com as cores reais
+  var mock='<div style="background:linear-gradient(135deg,'+esc(pal[0]||'#222')+'22,'+esc(pal[1]||'#111')+'22);padding:18px;border-radius:12px;margin-top:12px">'+
+    '<div style="font-family:'+esc(font)+';font-weight:800;font-size:20px;color:'+esc(titleColor)+';text-align:center;text-shadow:0 2px 8px rgba(0,0,0,.8);margin-bottom:4px">Título de Exemplo</div>'+
+    '<div style="font-family:'+esc(font)+';font-weight:600;font-size:13px;color:'+esc(titleColor)+';text-align:center;opacity:1;margin-bottom:14px">Subtítulo legível de exemplo</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+      ['Opção Um','Opção Dois'].map(function(t){return '<div style="border:2px solid '+esc(accent)+';border-radius:10px;overflow:hidden"><div style="height:54px;background:linear-gradient(135deg,'+esc(accent)+'66,'+esc(pal[1]||'#333')+'66)"></div><div style="font-family:'+esc(font)+';font-weight:800;font-size:14px;color:'+esc(itemText)+';background:'+esc(itemBg)+';padding:10px;text-align:center">'+t+'</div></div>'}).join('')+
+    '</div></div>';
+  var html='<div class="clean-view"><span class="tag">PRÉVIA VISUAL — é assim que vai ficar</span>'+
+    '<p style="margin:10px 0 4px"><b>Paleta:</b> '+sw+'</p>'+
+    '<p><b>Fonte:</b> '+esc(font)+'</p>'+
+    mock+
+    '<p style="margin-top:10px;color:var(--muted)">'+esc(dir.mood||'')+'</p>'+
+    '<p style="margin-top:6px;color:var(--green);font-size:12px">✓ Contraste garantido — o backend força legibilidade com !important</p></div>';
   var pc=document.createElement('div');pc.className='block-card';
   pc.innerHTML='<div class="block-head"><span class="block-title">◢ Grid · Prévia visual</span><span class="block-status done">✓ prévia</span></div><div class="block-body">'+html+'</div>';
   var gridCard=$('#card-grid');
@@ -462,19 +495,57 @@ function wireOptimizer(){
     rd.onload=function(){$('#optContent').value=rd.result;toast('Arquivo carregado: '+f.name)};
     rd.readAsText(f);
   };
+  // mostra toggle de imagens so pra onboard/sequencia
+  function updImgToggle(){
+    var k=$('#optKind').value.toLowerCase();
+    var show=k.indexOf('onboard')>=0||k.indexOf('sequ')>=0;
+    $('#optImgToggle').style.display=show?'flex':'none';
+  }
+  $('#optKind').onchange=updImgToggle;updImgToggle();
+
   $('#optBtn').onclick=function(){
     var content=$('#optContent').value.trim();if(!content){toast('Cole o conteúdo.');return}
     if(!CFG.serverKey&&!USER_KEY){$('#keyModal').classList.remove('hidden');return}
     var out=$('#optOutput');out.innerHTML='';out.appendChild(makeOptCard());$('#optBtn').disabled=true;
-    fetch('/api/optimize',{method:'POST',headers:authHeaders(),body:JSON.stringify({content:content,kind:$('#optKind').value,platform:$('#optPlatform').value,context:$('#optContext').value.trim(),model:$('#optModel').value})})
+    var kind=$('#optKind').value;var wantImg=$('#optWantImages').checked&&$('#optImgToggle').style.display!=='none';
+    fetch('/api/optimize',{method:'POST',headers:authHeaders(),body:JSON.stringify({content:content,kind:kind,platform:$('#optPlatform').value,context:$('#optContext').value.trim(),model:$('#optModel').value})})
     .then(function(r){return r.json()}).then(function(res){
       $('#optBtn').disabled=false;
       if(res.error){$('#optSt').className='block-status error';$('#optSt').textContent='✕ erro';$('#optBd').innerHTML='<pre>ERRO: '+esc(res.error)+'</pre>';return}
       window._opt=res;$('#optSt').className='block-status done';$('#optSt').textContent='✓ pronto';
       if(res.isJson&&res.json){$('#optBd').innerHTML='<pre>'+esc(JSON.stringify(res.json,null,2))+'</pre>';$('#optDl').style.display='inline-block'}
       else{$('#optBd').innerHTML='<pre>'+esc(res.raw)+'</pre>'}
+      // gera prompts de imagem se pedido e se temos JSON do fluxo
+      if(wantImg&&res.json){optGenImages(res.json,kind)}
     }).catch(function(err){$('#optBtn').disabled=false;$('#optSt').className='block-status error';$('#optSt').textContent='✕ erro';$('#optBd').innerHTML='<pre>ERRO: '+esc(err.message)+'</pre>'});
   };
+}
+
+// gera prompts de imagem a partir do fluxo otimizado
+function optGenImages(flow,kind){
+  var bd=menuBreakdown(flow);
+  if(!bd.total){toast('Nenhum card de menu encontrado pra gerar imagens.');return}
+  var isSeq=kind.toLowerCase().indexOf('sequ')>=0;
+  var params={
+    niche:$('#niche').value.trim()||'campanha',
+    flowLang:$('#flowLang')?$('#flowLang').value:'en-US',
+    contentLang:$('#contentLang')?$('#contentLang').value:'pt-BR',
+    personaLabel:'',
+    onboardMenuCount:isSeq?0:bd.total, onboardMenuMap:isSeq?[]:bd.map,
+    seqMenuCount:isSeq?bd.total:0, seqMenuMap:isSeq?bd.map:[]
+  };
+  var card=document.createElement('div');card.className='block-card';
+  card.innerHTML='<div class="block-head"><span class="block-title">◢ Prompts de Imagem ('+bd.total+' cards)</span><div class="block-actions"><span class="block-status loading" id="oiSt"><span class="spinner"></span> gerando</span><button class="mini-btn" id="oiCp">copiar</button></div></div><div class="block-body" id="oiBd"></div>';
+  $('#optOutput').appendChild(card);
+  setTimeout(function(){$('#oiCp').onclick=function(){navigator.clipboard.writeText(window._optImg||'').then(function(){$('#oiCp').textContent='✓ copiado';setTimeout(function(){$('#oiCp').textContent='copiar'},1400)})}},0);
+  fetch('/api/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({block:'image_prompts',params:params,model:$('#optModel').value})})
+  .then(function(r){return r.json()}).then(function(res){
+    if(res.error){$('#oiSt').className='block-status error';$('#oiSt').textContent='✕ erro';$('#oiBd').innerHTML='<pre>ERRO: '+esc(res.error)+'</pre>';return}
+    var j=res.json||safeParse(res.raw);
+    window._optImg=cleanText('image_prompts',j,res.raw);
+    $('#oiSt').className='block-status done';$('#oiSt').textContent='✓ pronto';
+    $('#oiBd').innerHTML='<div class="clean-view">'+sanitize('image_prompts',j,res.raw)+'</div>';
+  }).catch(function(err){$('#oiSt').className='block-status error';$('#oiSt').textContent='✕ erro';$('#oiBd').innerHTML='<pre>ERRO: '+esc(err.message)+'</pre>'});
 }
 function makeOptCard(){
   var c=document.createElement('div');c.className='block-card';

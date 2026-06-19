@@ -278,6 +278,10 @@
       <label>Contexto / objetivo (opcional)</label>
       <input type="text" id="optContext" placeholder="ex: aumentar urgência, focar público feminino, melhorar CTR">
     </div>
+    <div class="toggle-card" id="optImgToggle" style="display:none">
+      <label class="switch"><input type="checkbox" id="optWantImages"><span class="slider"></span></label>
+      <div class="toggle-info"><b>🖼️ Gerar prompts de imagem dos cards</b><span>Após otimizar, gera um prompt por card de menu do fluxo otimizado</span></div>
+    </div>
     <div class="full-field">
       <label>Conteúdo original <button id="optUpload" class="btn-ghost-sm" style="margin-left:8px">📁 Carregar .json</button><input type="file" id="optFile" accept=".json,.txt" style="display:none"></label>
       <textarea id="optContent" rows="12" placeholder="Cole aqui o JSON ou texto... ou carregue um arquivo"></textarea>
