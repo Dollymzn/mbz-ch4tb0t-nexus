@@ -126,6 +126,8 @@ label{font-family:var(--f-body);font-weight:600}
 .big-field input{font-family:var(--f-display);font-size:22px;padding:20px 22px;font-weight:500;text-align:center}
 .inline-suggest{margin-top:28px}
 .inline-suggest label{display:block;font-size:13px;color:var(--cyan);letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase}
+.geo-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px}
+.geo-field label{display:block;font-size:13px;color:var(--green);letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase}
 .suggest-row{display:flex;gap:10px}
 .suggest-row input{flex:1}
 .suggest-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}

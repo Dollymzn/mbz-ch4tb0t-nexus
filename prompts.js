@@ -74,6 +74,29 @@ const CURRENCIES = [
   { id: 'MXN', label: 'MXN ($)' }
 ];
 
+const COUNTRIES = [
+  { id: 'BR', label: 'Brasil' }, { id: 'US', label: 'Estados Unidos' },
+  { id: 'DE', label: 'Alemanha' }, { id: 'IT', label: 'Italia' },
+  { id: 'FR', label: 'Franca' }, { id: 'ES', label: 'Espanha' },
+  { id: 'PT', label: 'Portugal' }, { id: 'MX', label: 'Mexico' },
+  { id: 'AR', label: 'Argentina' }, { id: 'CO', label: 'Colombia' },
+  { id: 'CL', label: 'Chile' }, { id: 'PE', label: 'Peru' },
+  { id: 'RO', label: 'Romenia' }, { id: 'PL', label: 'Polonia' },
+  { id: 'GB', label: 'Reino Unido' }, { id: 'IE', label: 'Irlanda' },
+  { id: 'NL', label: 'Holanda' }, { id: 'BE', label: 'Belgica' },
+  { id: 'AT', label: 'Austria' }, { id: 'CH', label: 'Suica' },
+  { id: 'SE', label: 'Suecia' }, { id: 'NO', label: 'Noruega' },
+  { id: 'DK', label: 'Dinamarca' }, { id: 'FI', label: 'Finlandia' },
+  { id: 'GR', label: 'Grecia' }, { id: 'CZ', label: 'Republica Tcheca' },
+  { id: 'HU', label: 'Hungria' }, { id: 'BG', label: 'Bulgaria' },
+  { id: 'SK', label: 'Eslovaquia' }, { id: 'HR', label: 'Croacia' },
+  { id: 'CA', label: 'Canada' }, { id: 'AU', label: 'Australia' },
+  { id: 'NZ', label: 'Nova Zelandia' }, { id: 'ZA', label: 'Africa do Sul' },
+  { id: 'IN', label: 'India' }, { id: 'AE', label: 'Emirados Arabes' },
+  { id: 'SA', label: 'Arabia Saudita' }, { id: 'TR', label: 'Turquia' },
+  { id: 'JP', label: 'Japao' }, { id: 'KR', label: 'Coreia do Sul' }
+];
+
 const CREATIVE_PLATFORMS = [
   { id: 'svg_claude', label: 'SVG (Claude / VECTORFLUX)' },
   { id: 'dalle', label: 'DALL-E (OpenAI)' },
@@ -107,6 +130,6 @@ function buildSystemPrompt() {
 }
 
 module.exports = {
-  PERSONAS, LANGUAGES, CURRENCIES, CREATIVE_PLATFORMS, CREATIVE_SIZES,
+  PERSONAS, LANGUAGES, CURRENCIES, COUNTRIES, CREATIVE_PLATFORMS, CREATIVE_SIZES,
   buildSystemPrompt, CHATDRINK_FORMAT, CHATFOOD_FORMAT
 };

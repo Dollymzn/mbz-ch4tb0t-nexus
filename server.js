@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const {
-  PERSONAS, LANGUAGES, CURRENCIES, CREATIVE_PLATFORMS, CREATIVE_SIZES,
+  PERSONAS, LANGUAGES, CURRENCIES, COUNTRIES, CREATIVE_PLATFORMS, CREATIVE_SIZES,
   buildSystemPrompt
 } = require('./prompts');
 
@@ -31,7 +31,7 @@ const ANTHROPIC_VERSION = '2023-06-01';
 app.get('/api/config', (req, res) => {
   res.json({
     serverKey: !!SERVER_API_KEY, needPassword: !!ACCESS_PASSWORD,
-    personas: PERSONAS, languages: LANGUAGES, currencies: CURRENCIES,
+    personas: PERSONAS, languages: LANGUAGES, currencies: CURRENCIES, countries: COUNTRIES,
     creativePlatforms: CREATIVE_PLATFORMS, creativeSizes: CREATIVE_SIZES
   });
 });
@@ -316,7 +316,7 @@ SLUG: ${nslug}`;
 
   switch (block) {
     case 'page_name':
-      return `${ctx}\nGere 6 nomes de pagina de Facebook que pareçam PESSOAS REAIS adequadas ESPECIFICAMENTE ao nicho "${p.niche}". Devem combinar com o tema do nicho. Responda JSON: {"names":["Nome Sobrenome", ...]}`;
+      return `${ctx}\nGere 6 nomes de pagina de Facebook que pareçam PESSOAS REAIS, adequadas ao nicho "${p.niche}"${p.geoCountry ? ' E culturalmente coerentes com o pais-alvo: ' + p.geoCountry : ''}${p.campaignLang ? ' (idioma/origem: ' + p.campaignLang + ')' : ''}. Os nomes devem soar nativos do pais-alvo (ex: Italia -> nomes italianos como Giulia Rossi; Polonia -> nomes poloneses como Zofia Kowalska; Brasil -> nomes brasileiros). Combine o tom com o nicho. Responda JSON: {"names":["Nome Sobrenome", ...]}`;
 
     case 'onboard': {
       const nr = p.onboardRoutes || 7;
@@ -410,7 +410,7 @@ Gere prompts de imagem (INGLES) na quantidade EXATA de cards de menu existentes.
 ONBOARD: EXATAMENTE ${onbMenus} prompts (so cards de menu; botoes nao tem imagem).
 SEQUENCIA: EXATAMENTE ${seqMenus} prompts no total.${seqMapStr ? ' Distribuicao real por rota: ' + seqMapStr + '. Gere os cards respeitando essa distribuicao (rota 1 com seus cards, rota 2 com os seus, etc).' : ''}
 NUNCA gere 10 por rota por padrao — use o numero real informado. Total sequencia = ${seqMenus}, total onboard = ${onbMenus}.
-Cada prompt descritivo, vertical, conforme o nicho "${p.niche}".
+Cada prompt descritivo, formato HORIZONTAL 1200x628 (formato de card de menu do Messenger, NUNCA vertical), conforme o nicho "${p.niche}". Todos os prompts DEVEM terminar com ", 1200x628 horizontal banner composition".
 Responda JSON: {"onboard":[{"step":"onb1","prompt":"..."}],"sequence":[{"route":1,"step":"seq1-card1","prompt":"..."}]}. onboard com ${onbMenus} itens, sequence com ${seqMenus} itens.`;
     }
 

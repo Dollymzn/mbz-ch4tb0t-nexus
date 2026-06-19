@@ -51,6 +51,7 @@ function loadConfig(){
     fillSel('#flowLang',cfg.languages,'id','label','en-US');
     fillSel('#contentLang',cfg.languages,'id','label','pt-BR');
     fillSel('#campaignLang',cfg.languages,'id','label','pt-BR');
+    if(cfg.countries)fillSel('#geoCountry',cfg.countries,'label','label','Brasil');
     fillSel('#currency',cfg.currencies,'id','label','USD');
     fillSel('#persona',cfg.personas,'id','label','sem_persona');
     fillSel('#creativePlatform',cfg.creativePlatforms,'id','label','svg_claude');
@@ -156,6 +157,7 @@ function gotoStep(n){
   $('#wizNext').classList.toggle('hidden',n===totalSteps);
   $('#wizForge').classList.toggle('hidden',n!==totalSteps);
   if(n===totalSteps)updateSummary();
+  if(n===2){var cl=$('#campaignLang');var ce=$('#campaignLangEcho');if(ce&&cl){var lbl=cl.options[cl.selectedIndex]?cl.options[cl.selectedIndex].text:'';var geo=$('#geoCountry').value.trim();ce.textContent=(geo?geo+' · ':'')+lbl}}
   $('#wizard').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
@@ -219,7 +221,7 @@ function authHeaders(){var h={'content-type':'application/json'};if(CFG.needPass
 function collectParams(){
   var ps=$('#persona');
   lastParams={
-    niche:$('#niche').value.trim(),pageName:$('#pageName').value.trim(),
+    niche:$('#niche').value.trim(),pageName:$('#pageName').value.trim(),geoCountry:$('#geoCountry').value.trim(),
     flowLang:$('#flowLang').value,contentLang:$('#contentLang').value,campaignLang:$('#campaignLang').value,currency:$('#currency').value,
     persona:ps.value,personaLabel:ps.options[ps.selectedIndex].text,
     platform:document.querySelector('input[name=platform]:checked').value,
@@ -326,6 +328,7 @@ function showGridDirection(b,dir){
     '<p style="margin-top:6px;color:var(--green);font-size:12px">✓ Contraste garantido — o backend força legibilidade com !important</p></div>';
   var pc=document.createElement('div');pc.className='block-card';
   pc.innerHTML='<div class="block-head"><span class="block-title">◢ Grid · Prévia visual</span><span class="block-status done">✓ prévia</span></div><div class="block-body">'+html+'</div>';
+  pc.querySelector('.block-head').onclick=function(){pc.querySelector('.block-body').classList.toggle('collapsed')};
   var gridCard=$('#card-grid');
   if(gridCard&&gridCard.parentNode)gridCard.parentNode.insertBefore(pc,gridCard);
 }

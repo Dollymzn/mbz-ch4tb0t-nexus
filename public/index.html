@@ -72,11 +72,21 @@
           <div class="big-field">
             <input type="text" id="niche" placeholder="ex: Carta de Amor, Copa do Mundo, Cartão de Crédito">
           </div>
+          <div class="geo-row">
+            <div class="geo-field">
+              <label>🎯 País-alvo (GEO)</label>
+              <select id="geoCountry"></select>
+            </div>
+            <div class="geo-field">
+              <label>🌍 Idioma da campanha</label>
+              <select id="campaignLang"></select>
+            </div>
+          </div>
           <div class="inline-suggest">
             <label>Nome da página no Facebook</label>
             <div class="suggest-row">
               <input type="text" id="pageName" placeholder="ex: Aurora del Amor">
-              <button id="suggestName" class="btn-ghost-sm">✨ Sugerir do nicho</button>
+              <button id="suggestName" class="btn-ghost-sm">✨ Sugerir do nicho + país</button>
             </div>
             <div class="suggest-chips" id="nameChips"></div>
           </div>
@@ -99,8 +109,8 @@
               <small>P1, P2, grid e quiz</small>
             </div>
             <div class="sel-card" style="border-color:var(--green)">
-              <label style="color:var(--green)">🎯 Idioma da campanha (GEO)</label>
-              <select id="campaignLang"></select>
+              <label style="color:var(--green)">🎯 Campanha (definida no passo 1)</label>
+              <div id="campaignLangEcho" style="font-family:var(--f-mono);color:var(--green);padding:10px 0;font-size:14px">—</div>
               <small>País-alvo · copy e onboard do Meta</small>
             </div>
             <div class="sel-card">
