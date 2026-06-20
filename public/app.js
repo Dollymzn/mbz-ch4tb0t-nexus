@@ -13,6 +13,7 @@ var BLOCKS=[
   {id:'page_name',name:'Nome de Página',hint:'sugestão FB',kind:'text',def:true},
   {id:'onboard',name:'Onboard',hint:'JSON chatbot',kind:'json-download',def:true},
   {id:'sequence',name:'Sequência',hint:'JSON chatbot',kind:'json-download',def:true},
+  {id:'comment',name:'Comentários',hint:'captação orgânica',kind:'json-download',def:false},
   {id:'grid',name:'Grid MIRB',hint:'JSON importável',kind:'json-download',def:true},
   {id:'p1_titles',name:'Títulos P1',hint:'texto',kind:'text',def:true},
   {id:'p2_titles',name:'Títulos P2',hint:'texto',kind:'text',def:true},
@@ -443,7 +444,7 @@ function doCopy(b){
 function doDownload(b){
   var data=lastBlocks[b];if(!data||!data.json){toast('JSON inválido — veja o conteúdo.');return}
   var name=(lastParams.niche||'funil').toLowerCase().replace(/[^a-z0-9]+/g,'-');
-  var fn=b==='onboard'?'onboard-'+name+'.json':b==='sequence'?'sequencia-'+name+'.json':b==='grid'?'mirb-grid-'+name+'.json':b+'-'+name+'.json';
+  var fn=b==='onboard'?'onboard-'+name+'.json':b==='sequence'?'sequencia-'+name+'.json':b==='grid'?'mirb-grid-'+name+'.json':b==='comment'?'comentarios-'+name+'.json':b+'-'+name+'.json';
   var blob=new Blob([JSON.stringify(data.json,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);
   toast('Baixado: '+fn);

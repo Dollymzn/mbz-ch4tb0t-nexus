@@ -30,6 +30,17 @@ REGRA DE OURO DO ONBOARD CHATDRINK (SIGA EXATAMENTE - NAO INVENTE):
 URLs sequencia: {{URL_REDIR}}?utm_source=sequence&utm_campaign={{UTM_CAMPAIGN}}&utm_medium={{NOMEDAPAGINA}}&utm_term=sequence&utm_content=seq1-<nicho>
 URLs onboard: {{URL_REDIR}}?utm_source=onboard&utm_campaign={{UTM_CAMPAIGN}}&utm_medium={{NOMEDAPAGINA}}&utm_term=onboard&utm_content=onb1-<nicho>
 Variaveis: {{FIRST_NAME}}, {{URL_REDIR}}, {{UTM_CAMPAIGN}}, {{NOMEDAPAGINA}}
+
+FLUXO DE COMENTARIOS CHATDRINK (captacao de lead organico via comentarios):
+{ "name":"<Nome>", "type":"comment", "active":true,
+  "routes":[ { "id":"route_0","name":"Rota 1","sort_order":0,"color":null,
+    "interactions":[ { "type":"mensagem","config":{
+      "text":"<mensagem de abertura da persona, instigante, fala de algo que o lead vai receber/descobrir>",
+      "buttons":[],
+      "quick_replies":[ {"label":"<emoji + texto curto>","action_type":"route","target_route":"","target_flow":""} (5 quick_replies) ],
+      "redirect_type":"","redirect_target":"" }, "sort_order":0 } ] } ],
+  "comment_trigger":{"reply_public":false,"reply_public_text":"","active":true} }
+- E SO uma rota, com UMA mensagem + 5 quick_replies. NAO tem menu/delay/botoes. O target_route/target_flow ficam vazios (o usuario liga no painel).
 `;
 
 const CHATFOOD_FORMAT = `
@@ -41,6 +52,12 @@ PLATAFORMA CHATFOOD — formato JSON (DIFERENTE do ChatDrink):
   * mensagem: { "format":"message","type":"buttons_menu","option":[{"option":[],"type":"url","urls":[{"url":"<url>","weight":100}],"title":"<botao>"}],"redirect":"ROUTE_X","title":"<texto persona>" }
 - Se pede N sequencias, crie N rotas no WELCOME.random, cada ROUTE_N completa.
 - ONBOARD ChatFood: WELCOME random -> cada ROUTE_N = simple_menu (card) + buttons_menu (mensagem+botao) com "redirect".
+
+FLUXO DE COMENTARIOS CHATFOOD (captacao de lead organico):
+{ "WELCOME":{ "MESSAGES":[ { "format":"message","type":"text","message":{
+  "option":[ {"title":"<emoji + texto curto MAIUSCULO>","type":"redirect","option":[],"action":""} (3 a 5 opcoes) ],
+  "text":"<texto curto instigante + emoji + 👇>" } } ] } }
+- SO o WELCOME, com UMA mensagem type:"text", message.text + message.option[] (botoes redirect). action vazio (usuario liga no painel).
 `;
 
 const PERSONAS = [

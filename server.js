@@ -261,7 +261,7 @@ app.post('/api/optimize', async (req, res) => {
     const { content, kind, context, model, platform } = req.body || {};
     if (!content) return res.status(400).json({ error: 'Cole o conteudo a otimizar.' });
 
-    const isJsonKind = ['onboard', 'sequência', 'sequencia', 'grid'].includes((kind || '').toLowerCase());
+    const isJsonKind = ['onboard', 'sequência', 'sequencia', 'grid', 'comment'].includes((kind || '').toLowerCase());
     const system = buildSystemPrompt();
     const userMsg = `TAREFA: Otimizar o seguinte ${kind || 'conteudo'} de funil de arbitragem.
 ${platform ? 'Plataforma: ' + platform + '. Mantenha EXATAMENTE o formato JSON dessa plataforma.' : ''}
@@ -317,6 +317,18 @@ SLUG: ${nslug}`;
   switch (block) {
     case 'page_name':
       return `${ctx}\nGere 6 nomes de pagina de Facebook que pareçam PESSOAS REAIS, adequadas ao nicho "${p.niche}"${p.geoCountry ? ' E culturalmente coerentes com o pais-alvo: ' + p.geoCountry : ''}${p.campaignLang ? ' (idioma/origem: ' + p.campaignLang + ')' : ''}. Os nomes devem soar nativos do pais-alvo (ex: Italia -> nomes italianos como Giulia Rossi; Polonia -> nomes poloneses como Zofia Kowalska; Brasil -> nomes brasileiros). Combine o tom com o nicho. Responda JSON: {"names":["Nome Sobrenome", ...]}`;
+
+    case 'comment':
+      if ((p.platform || 'chatdrink') === 'chatfood') {
+        return `${ctx}
+Gere o FLUXO DE COMENTARIOS ChatFood (captacao de lead organico via comentarios em posts).
+Apenas WELCOME com UMA mensagem type:"text": message.text instigante (curto, emoji, 👇) no idioma ${p.flowLang || 'en-US'}, persona ${p.personaLabel}, + message.option[] com ${p.commentOptions || 4} botoes (title em MAIUSCULO com emoji, type:"redirect", action:"").
+Responda APENAS o JSON valido no formato exato do ChatFood comment.`;
+      }
+      return `${ctx}
+Gere o FLUXO DE COMENTARIOS ChatDrink (captacao de lead organico via comentarios em posts).
+type:"comment", uma unica rota route_0 com UMA interaction "mensagem": text instigante da persona ${p.personaLabel} (fala de algo que o lead vai descobrir/receber, gera curiosidade) no idioma ${p.flowLang || 'en-US'}, + ${p.commentOptions || 5} quick_replies (label com emoji + texto curto, action_type:"route", target_route:"", target_flow:""). Inclua o bloco comment_trigger:{"reply_public":false,"reply_public_text":"","active":true}.
+Responda APENAS o JSON valido no formato exato do ChatDrink comment.`;
 
     case 'onboard': {
       const nr = p.onboardRoutes || 7;
