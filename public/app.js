@@ -395,12 +395,45 @@ function setBody(b,html){var e=$('#bd-'+b);if(e)e.innerHTML=html}
 /* ---------- render: JSON-download vs text-clean ---------- */
 function renderBlock(b,res){
   var meta=BLOCKS.filter(function(x){return x.id===b})[0]||{kind:'text'};
+  if(b==='grid'){
+    setBody(b,renderGridView(res.json,res.raw));
+    setTimeout(bindIpCopy,0);
+    return;
+  }
   if(meta.kind==='json-download'){
     var pretty=res.json?JSON.stringify(res.json,null,2):res.raw;
     setBody(b,'<pre>'+esc(pretty)+'</pre>');
   }else{
     setBody(b,'<div class="clean-view">'+sanitize(b,res.json,res.raw)+'</div>');
   }
+}
+
+// grid: mostra itens com titulo + link clicavel do Pinterest, e o JSON cru recolhivel
+function renderGridView(j,raw){
+  if(!j)j=safeParse(raw);
+  if(!j||!j.items)return '<pre>'+esc(raw||'')+'</pre>';
+  var g=j.grid||{};
+  var h='<div class="clean-view">';
+  if(g.title)h+='<h4>'+esc(g.title)+'</h4>';
+  if(g.subtitle)h+='<p style="color:var(--muted);margin-bottom:12px">'+esc(g.subtitle)+'</p>';
+  h+='<div style="display:flex;flex-direction:column;gap:8px">';
+  j.items.forEach(function(it,i){
+    var pin=it.item_image||'';
+    var url='https://www.pinterest.com/search/pins/?q='+encodeURIComponent(pin);
+    var id='gp_'+i;window._ipStore=window._ipStore||{};window._ipStore[id]=pin;
+    h+='<div class="kv" style="padding-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
+       '<b>'+(i+1)+'. '+esc(it.item_title||'')+'</b>'+
+       '<button class="mini-btn ipcopy" data-ip="'+id+'">copiar busca</button></div>'+
+       '<p style="margin-top:4px"><span class="pin">📌 '+esc(pin)+'</span> &nbsp;<a href="'+esc(url)+'" target="_blank" style="color:var(--cyan);font-size:12px">abrir no Pinterest ↗</a></p></div>';
+  });
+  h+='</div>';
+  // JSON cru recolhivel
+  h+='<div style="margin-top:14px"><button class="mini-btn" id="gridJsonToggle">▼ ver JSON de importação</button><pre id="gridJsonRaw" style="display:none;margin-top:8px">'+esc(JSON.stringify(j,null,2))+'</pre></div>';
+  h+='</div>';
+  setTimeout(function(){
+    var t=$('#gridJsonToggle');if(t)t.onclick=function(e){e.stopPropagation();var r=$('#gridJsonRaw');var show=r.style.display==='none';r.style.display=show?'block':'none';t.textContent=(show?'▲':'▼')+' ver JSON de importação'};
+  },0);
+  return h;
 }
 
 // transforma JSON em texto limpo legível por bloco
@@ -440,9 +473,23 @@ function sanitize(b,j,raw){
       }).join('');
     }
     if(b==='image_prompts'){
-      var h='';
-      if(j.onboard){h+='<h4>Onboard</h4>'+j.onboard.map(function(o){return '<div class="kv"><span class="tag">'+esc(o.step||'')+'</span><p>'+esc(o.prompt||'')+'</p></div>'}).join('')}
-      if(j.sequence){h+='<h4>Sequência</h4>'+j.sequence.map(function(o){return '<div class="kv"><span class="tag">rota '+esc(String(o.route||''))+' · '+esc(o.step||'')+'</span><p>'+esc(o.prompt||'')+'</p></div>'}).join('')}
+      var h='';var pi=0;
+      function promptRow(tag,prompt){
+        var id='ip_'+(pi++);
+        window._ipStore=window._ipStore||{};window._ipStore[id]=prompt;
+        return '<div class="kv"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span class="tag">'+esc(tag)+'</span><button class="mini-btn ipcopy" data-ip="'+id+'">copiar</button></div><p>'+esc(prompt)+'</p></div>';
+      }
+      if(j.onboard&&j.onboard.length){h+='<h4>Onboard ('+j.onboard.length+')</h4>'+j.onboard.map(function(o){return promptRow(o.step||'onb',o.prompt||'')}).join('')}
+      if(j.sequence&&j.sequence.length){
+        // agrupa por rota
+        var byRoute={};j.sequence.forEach(function(o){var r=o.route!=null?o.route:1;(byRoute[r]=byRoute[r]||[]).push(o)});
+        h+='<h4>Sequência ('+j.sequence.length+')</h4>';
+        Object.keys(byRoute).sort(function(a,b){return a-b}).forEach(function(r){
+          h+='<div style="margin:8px 0 4px;color:var(--pink);font-family:var(--f-mono);font-size:12px">— Rota '+esc(r)+' ('+byRoute[r].length+' cards)</div>';
+          h+=byRoute[r].map(function(o){return promptRow(o.step||('seq'+r),o.prompt||'')}).join('');
+        });
+      }
+      setTimeout(bindIpCopy,0);
       return h;
     }
     if(b==='creatives_prompt'){
@@ -636,6 +683,16 @@ function wireKeyModal(){
 
 /* ---------- utils ---------- */
 function safeParse(t){if(!t)return null;try{return JSON.parse(t)}catch(e){}var f=t.indexOf('{'),fa=t.indexOf('[');var s=f<0?fa:fa<0?f:Math.min(f,fa);if(s<0)return null;var l=Math.max(t.lastIndexOf('}'),t.lastIndexOf(']'));if(l>s){try{return JSON.parse(t.slice(s,l+1))}catch(e){}}return null}
+function bindIpCopy(){
+  $$('.ipcopy').forEach(function(btn){
+    if(btn._bound)return;btn._bound=true;
+    btn.onclick=function(e){
+      e.stopPropagation();
+      var id=btn.getAttribute('data-ip');var txt=(window._ipStore&&window._ipStore[id])||'';
+      navigator.clipboard.writeText(txt).then(function(){btn.textContent='✓';setTimeout(function(){btn.textContent='copiar'},1200)});
+    };
+  });
+}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('show')},2600)}
 })();

@@ -434,18 +434,34 @@ Responda JSON: {"quizzes":[{"p1_index":1,"type":"texto","question":"","options":
     case 'image_prompts': {
       const onbMenus = p.onboardMenuCount != null ? p.onboardMenuCount : (p.onboardRoutes || 7);
       const seqMenus = p.seqMenuCount != null ? p.seqMenuCount : (p.seqRoutes || 3) * 7;
-      const seqMapStr = p.seqMenuMap ? p.seqMenuMap.map(r => `rota ${r.route}=${r.menus} cards`).join(', ') : '';
       const themeLine = p.fromOptimizer
         ? `IMPORTANTE: baseie os prompts EXCLUSIVAMENTE no conteudo/tema do fluxo abaixo (ignore qualquer outro nicho). Conteudo real do fluxo enviado: "${p.niche}". As imagens devem refletir ESTE tema, nada alem disso.`
         : `Tema/nicho: "${p.niche}".`;
+      // monta o esqueleto EXATO esperado a partir do mapa real de menus por rota
+      let seqSkeleton = '';
+      let seqExpected = seqMenus;
+      if (p.seqMenuMap && p.seqMenuMap.length) {
+        const items = [];
+        p.seqMenuMap.forEach((r, ri) => {
+          const routeNum = ri + 1; // rota 1, 2, 3... (sequencial, nao o indice cru)
+          for (let c = 1; c <= r.menus; c++) items.push(`{"route":${routeNum},"step":"seq${routeNum}-card${c}","prompt":"..."}`);
+        });
+        seqExpected = items.length;
+        seqSkeleton = `\nESQUELETO EXATO da sequencia (preencha cada "prompt", mantenha route e step EXATAMENTE como abaixo):\n[${items.join(',')}]`;
+      }
+      let onbSkeleton = '';
+      if (!p.fromOptimizer || onbMenus > 0) {
+        const oitems = [];
+        for (let c = 1; c <= onbMenus; c++) oitems.push(`{"step":"onb${c}","prompt":"..."}`);
+        onbSkeleton = onbMenus > 0 ? `\nESQUELETO EXATO do onboard (preencha cada prompt):\n[${oitems.join(',')}]` : '';
+      }
       return `${ctx}
-Gere prompts de imagem (INGLES) na quantidade EXATA de cards de menu existentes. NAO invente cards a mais nem a menos.
+Gere prompts de imagem (INGLES) na quantidade EXATA. NAO invente cards a mais nem a menos.
 ${themeLine}
-ONBOARD: EXATAMENTE ${onbMenus} prompts (so cards de menu; botoes nao tem imagem).
-SEQUENCIA: EXATAMENTE ${seqMenus} prompts no total.${seqMapStr ? ' Distribuicao real por rota: ' + seqMapStr + '. Gere os cards respeitando essa distribuicao (rota 1 com seus cards, rota 2 com os seus, etc).' : ''}
-NUNCA gere 10 por rota por padrao — use o numero real informado. Total sequencia = ${seqMenus}, total onboard = ${onbMenus}.
-Cada prompt descritivo, formato HORIZONTAL 1200x628 (formato de card de menu do Messenger, NUNCA vertical). Todos os prompts DEVEM terminar com ", 1200x628 horizontal banner composition".
-Responda JSON: {"onboard":[{"step":"onb1","prompt":"..."}],"sequence":[{"route":1,"step":"seq1-card1","prompt":"..."}]}. onboard com ${onbMenus} itens, sequence com ${seqMenus} itens.`;
+ONBOARD: EXATAMENTE ${onbMenus} prompts.${onbSkeleton}
+SEQUENCIA: EXATAMENTE ${seqExpected} prompts, DISTRIBUIDOS entre as rotas conforme o esqueleto. NAO coloque tudo na rota 1 — cada card tem sua rota correta.${seqSkeleton}
+Cada prompt descritivo, formato HORIZONTAL 1200x628 (formato de card de menu do Messenger, NUNCA vertical). Todos terminam com ", 1200x628 horizontal banner composition".
+Responda JSON: {"onboard":[...],"sequence":[...]} preenchendo os esqueletos acima EXATAMENTE (mesmos route e step).`;
     }
 
     case 'creatives_prompt': {
