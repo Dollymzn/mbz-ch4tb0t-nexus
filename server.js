@@ -391,7 +391,7 @@ Gere exatamente ${p.gridCols * p.gridRows} items com item_order incremental.`;
     case 'quiz':
       return `${ctx}
 Gere ${p.numP1} quiz overlays (UM por P1) no idioma ${p.contentLang}.
-Tipos: "texto", "visual" (opcoes com imagem), "roleta". Varie conforme cada P1.
+Tipos: APENAS "texto" (quiz padrao com opcoes em texto) ou "visual" (opcoes com imagem). NUNCA use "roleta" ou qualquer outro tipo. Varie entre texto e visual conforme cada P1.
 Cada quiz: pergunta, opcoes (3-4; se visual incluir pinterest EN por opcao), loading, titulo final, cta, nota. ${p.currency !== 'USD' ? 'Moeda ' + p.currency + '.' : ''}
 Responda JSON: {"quizzes":[{"p1_index":1,"type":"texto","question":"","options":[{"label":"","pinterest":""}],"loading":"","final_title":"","cta":"","note":""}]}`;
 
@@ -424,8 +424,14 @@ Gere um PROMPT completo para criar ${p.numCreatives || 20} criativos SVG de anun
 Gere ${p.numCreatives || 20} prompts de imagem para a plataforma ${plat} (formato ${p.creativeSize || '1080x1440'}) para anuncios do nicho "${p.niche}" no idioma ${p.flowLang || 'en-US'}. Estilo chamativo, gamificado quando possivel, com texto curto de headline e CTA descrito. Cada prompt pronto pra colar na ferramenta. Responda JSON: {"platform":"${plat}","size":"${p.creativeSize || '1080x1440'}","prompts":[{"index":1,"prompt":"...","headline":"...","cta":"..."}]}`;
     }
 
-    case 'audios':
-      return `${ctx}\nGere scripts de audio (ate 15s) para os criativos no idioma ${p.flowLang || 'en-US'}, otimizados para ElevenLabs v3 com tags emocionais ([excited],[whispers],[curious],[woo],[sighs]) reforcadas com texto, 250+ caracteres cada, CAPS pra enfase, nunca tag no final. Sugira voz expressiva (Jessica, Bella, Laura, Charlie) por audio.\nResponda JSON: {"audios":[{"index":1,"voice":"Jessica","script":"..."}]}`;
+    case 'audios': {
+      const nAudios = p.numCreatives || 20;
+      const cretxt = p.creativesContext ? `\nCRIATIVOS JA GERADOS (combine cada audio com o criativo correspondente, mesma ordem):\n${p.creativesContext}` : '';
+      return `${ctx}
+Gere EXATAMENTE ${nAudios} scripts de audio (ate 15s cada), UM para cada criativo (sao ${nAudios} criativos). Cada audio deve fazer sentido e COMBINAR com o criativo de mesmo indice (mesma ideia/headline/CTA).${cretxt}
+Idioma ${p.flowLang || 'en-US'}. Otimizados para ElevenLabs v3 com tags emocionais ([excited],[whispers],[curious],[woo],[sighs]) reforcadas com texto antes da tag, 250+ caracteres cada, CAPS pra enfase, nunca tag no final. Sugira voz expressiva (Jessica, Bella, Laura, Charlie, Charlotte) por audio variando conforme o tom.
+Responda JSON: {"audios":[{"index":1,"voice":"Jessica","script":"..."}]} com EXATAMENTE ${nAudios} itens, index de 1 a ${nAudios}.`;
+    }
 
     default:
       return `${ctx}\nBloco desconhecido: ${block}`;

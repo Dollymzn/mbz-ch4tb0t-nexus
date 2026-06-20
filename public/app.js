@@ -240,7 +240,7 @@ function runForge(){
   if(!lastParams.niche){toast('Digite o nicho.');gotoStep(1);return}
   if(!CFG.serverKey&&!USER_KEY){$('#keyModal').classList.remove('hidden');return}
   var blocks=selectedBlocks();if(!blocks.length){toast('Marque ao menos um bloco.');return}
-  var out=$('#output');out.innerHTML='';lastBlocks={};delete lastParams.gridDirection;delete lastParams.onboardMenuCount;delete lastParams.seqMenuCount;delete lastParams.onboardMenuMap;delete lastParams.seqMenuMap;
+  var out=$('#output');out.innerHTML='';lastBlocks={};delete lastParams.gridDirection;delete lastParams.onboardMenuCount;delete lastParams.seqMenuCount;delete lastParams.onboardMenuMap;delete lastParams.seqMenuMap;delete lastParams.creativesContext;
   $('#wizForge').disabled=true;$('#classicForge').disabled=true;$('#outputActions').classList.add('hidden');
   blocks.forEach(function(b){out.appendChild(makeCard(b))});
   out.scrollIntoView({behavior:'smooth',block:'start'});
@@ -271,6 +271,8 @@ function genBlock(b,done){
       // conta menus pra alimentar os prompts de imagem
       if(b==='onboard'&&res.json){var om=menuBreakdown(res.json);lastParams.onboardMenuCount=om.total;lastParams.onboardMenuMap=om.map}
       if(b==='sequence'&&res.json){var sm=menuBreakdown(res.json);lastParams.seqMenuCount=sm.total;lastParams.seqMenuMap=sm.map}
+      // captura contexto dos criativos pra casar com os audios
+      if(b==='creatives_prompt'&&res.json)lastParams.creativesContext=creativesSummary(res.json);
     }
     done();
   }).catch(function(err){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(err.message)+'</pre>');done()});
@@ -304,6 +306,18 @@ function menuBreakdown(flow){
     }
   }catch(e){}
   return {total:total,map:map};
+}
+// extrai um resumo dos criativos (headline/cta por indice) pra casar com os audios
+function creativesSummary(j){
+  try{
+    if(j.prompts&&j.prompts.length){
+      return j.prompts.map(function(p){return '#'+(p.index||'')+' '+(p.headline||'')+(p.cta?' | CTA: '+p.cta:'')}).join('\n').slice(0,2000);
+    }
+    if(j.prompt){ // svg: um markdown unico; manda um trecho pra dar contexto tematico
+      return String(j.prompt).slice(0,1500);
+    }
+  }catch(e){}
+  return '';
 }
 function showGridDirection(b,dir){
   var pal=(dir.palette||[]);
