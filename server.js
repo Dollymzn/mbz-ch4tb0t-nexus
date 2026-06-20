@@ -320,11 +320,21 @@ SLUG: ${nslug}`;
 
     case 'fb_images':
       return `${ctx}
-Gere 2 prompts de imagem (em INGLES) para a pagina de Facebook da persona "${p.pageName || 'a persona'}" do nicho "${p.niche}"${p.geoCountry ? ', pais-alvo ' + p.geoCountry : ''}${p.campaignLang ? ', idioma ' + p.campaignLang : ''}.
-A imagem deve refletir uma PESSOA REAL coerente com o nome, o pais e o nicho (etnia, cenario, elementos culturais do pais-alvo, ex: bandeira/paisagem do pais ao fundo, clima local).
-1) FOTO DE PERFIL (profile): retrato quadrado 1:1, rosto da persona em destaque, acolhedor, com elementos do nicho e do pais sutis ao fundo, iluminacao quente e profissional.
-2) FOTO DE CAPA (cover): banner horizontal 1640x856 (16:9 aprox), a persona em cena ambientada com o nome dela visivel como titulo elegante, elementos do nicho e simbolos/paisagem do pais-alvo, espaco pra texto, estetica premium.
-Inclua o nome "${p.pageName || ''}" no conceito da capa. Responda JSON: {"profile":{"prompt":"... 1:1 square portrait"},"cover":{"prompt":"... 1640x856 horizontal cover banner"}}`;
+Gere 2 prompts de imagem (em INGLES, muito detalhados) para a pagina de Facebook da persona "${p.pageName || 'a persona'}" do nicho "${p.niche}"${p.geoCountry ? ', pais-alvo ' + p.geoCountry : ''}${p.campaignLang ? ', idioma ' + p.campaignLang : ''}.
+A persona deve ser uma PESSOA REAL coerente com o nome, etnia e cultura do pais-alvo, e o estilo visual deve combinar com o nicho.
+
+1) FOTO DE PERFIL (profile): retrato quadrado 1:1, rosto/busto da persona em destaque, expressao acolhedora e magnetica, iluminacao cinematografica quente, leve profundidade de campo, elementos do nicho e do pais sutis ao fundo, cores ricas, qualidade editorial premium. Termine com ", 1:1 square portrait, professional photography, ultra detailed".
+
+2) FOTO DE CAPA (cover) — SIGA ESTA FORMULA DE ALTA QUALIDADE (estilo capa profissional de pagina):
+- Banner HORIZONTAL widescreen, formato 1640x856 (proporcao ~1.91:1, formato exato de capa do Facebook).
+- COMPOSICAO: a persona posicionada em UM DOS LADOS (esquerda ou direita ~1/3 do quadro), em pose elegante e tematica do nicho, ocupando verticalmente o frame. O LADO OPOSTO e o CENTRO reservados pra tipografia e atmosfera.
+- TIPOGRAFIA (parte central, descreva no prompt): o nome "${p.pageName || ''}" em DUAS fontes combinadas — primeiro nome em script caligrafico dourado elegante, sobrenome em serif maiuscula imponente; abaixo uma TAGLINE curta do nicho e 3-4 palavras-chave separadas por bullets (ex: FAITH • COMFORT • GUIDANCE pro nicho de fe). Divisores ornamentais finos (linha com pequeno coracao/simbolo no meio).
+- FAIXA INFERIOR: uma barra semi-transparente com 4 ICONES circulares + micro-labels representando os beneficios/features do nicho (ex: icone de pena = "DAILY MESSAGES", cruz = "FAITH", coracao = "COMFORT", estrela = "GUIDANCE").
+- ATMOSFERA: iluminacao etérea e premium coerente com o nicho (ex: luz dourada celestial pra fe; mistica/velas pra tarot; paisagem do pais-alvo ao fundo ${p.geoCountry || ''}), cores harmoniosas, raios de luz, bokeh, particulas suaves, profundidade cinematografica. Estetica de capa profissional, sofisticada, que transmite confianca.
+- Mencione o pais-alvo no cenario quando fizer sentido (paisagem, bandeira sutil, clima).
+Termine o prompt da capa com ", 1640x856 horizontal Facebook cover banner, cinematic premium composition, ultra detailed, elegant typography layout".
+
+Responda JSON: {"profile":{"prompt":"..."},"cover":{"prompt":"..."}}`;
 
     case 'comment':
       if ((p.platform || 'chatdrink') === 'chatfood') {
