@@ -131,6 +131,7 @@ label{font-family:var(--f-body);font-weight:600}
 .suggest-row{display:flex;gap:10px}
 .suggest-row input{flex:1}
 .suggest-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.fb-photos-row{margin-top:14px}
 .chip{font-family:var(--f-mono);font-size:12px;background:var(--panel2);border:1px solid var(--purple);color:#d8b4fe;padding:6px 14px;border-radius:18px;cursor:pointer;transition:.2s}
 .chip:hover{background:rgba(168,85,247,.15);box-shadow:0 0 14px rgba(168,85,247,.4)}
 

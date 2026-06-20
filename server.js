@@ -316,7 +316,15 @@ SLUG: ${nslug}`;
 
   switch (block) {
     case 'page_name':
-      return `${ctx}\nGere 6 nomes de pagina de Facebook que pareçam PESSOAS REAIS, adequadas ao nicho "${p.niche}"${p.geoCountry ? ' E culturalmente coerentes com o pais-alvo: ' + p.geoCountry : ''}${p.campaignLang ? ' (idioma/origem: ' + p.campaignLang + ')' : ''}. Os nomes devem soar nativos do pais-alvo (ex: Italia -> nomes italianos como Giulia Rossi; Polonia -> nomes poloneses como Zofia Kowalska; Brasil -> nomes brasileiros). Combine o tom com o nicho. Responda JSON: {"names":["Nome Sobrenome", ...]}`;
+      return `${ctx}\nGere 6 nomes de pagina de Facebook que pareçam PESSOAS REAIS, adequadas ao nicho "${p.niche}"${p.geoCountry ? ' E culturalmente coerentes com o pais-alvo: ' + p.geoCountry : ''}${p.campaignLang ? ' (idioma/origem: ' + p.campaignLang + ')' : ''}. Os nomes devem soar nativos do pais-alvo (ex: Italia -> nomes italianos como Giulia Rossi; Polonia -> nomes poloneses como Zofia Kowalska; Brasil -> nomes brasileiros; Canada/EN -> nomes como Claire Whitestone). Combine o tom com o nicho. Responda JSON: {"names":["Nome Sobrenome", ...]}`;
+
+    case 'fb_images':
+      return `${ctx}
+Gere 2 prompts de imagem (em INGLES) para a pagina de Facebook da persona "${p.pageName || 'a persona'}" do nicho "${p.niche}"${p.geoCountry ? ', pais-alvo ' + p.geoCountry : ''}${p.campaignLang ? ', idioma ' + p.campaignLang : ''}.
+A imagem deve refletir uma PESSOA REAL coerente com o nome, o pais e o nicho (etnia, cenario, elementos culturais do pais-alvo, ex: bandeira/paisagem do pais ao fundo, clima local).
+1) FOTO DE PERFIL (profile): retrato quadrado 1:1, rosto da persona em destaque, acolhedor, com elementos do nicho e do pais sutis ao fundo, iluminacao quente e profissional.
+2) FOTO DE CAPA (cover): banner horizontal 1640x856 (16:9 aprox), a persona em cena ambientada com o nome dela visivel como titulo elegante, elementos do nicho e simbolos/paisagem do pais-alvo, espaco pra texto, estetica premium.
+Inclua o nome "${p.pageName || ''}" no conceito da capa. Responda JSON: {"profile":{"prompt":"... 1:1 square portrait"},"cover":{"prompt":"... 1640x856 horizontal cover banner"}}`;
 
     case 'comment':
       if ((p.platform || 'chatdrink') === 'chatfood') {

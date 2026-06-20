@@ -72,6 +72,17 @@ const PERSONAS = [
   { id: 'masc_financeiro', label: 'Masculino financeiro (consultor de credito)' },
   { id: 'fem_beauty', label: 'Feminina beauty (especialista em beleza)' },
   { id: 'neutro_amigo', label: 'Neutro amigavel (assistente proximo)' },
+  { id: 'fem_crista', label: 'Feminina crista (fe / mensagem de Deus)' },
+  { id: 'masc_pastor', label: 'Masculino pastor (lider espiritual / pregador)' },
+  { id: 'fem_anjo', label: 'Feminina angelical (anjo da guarda / mensageira)' },
+  { id: 'masc_avo', label: 'Masculino avo sabio (vovo conselheiro)' },
+  { id: 'fem_avo', label: 'Feminina avo acolhedora (vovo carinhosa)' },
+  { id: 'fem_coach', label: 'Feminina coach (motivacional / autoajuda)' },
+  { id: 'masc_coach', label: 'Masculino coach (mentor / disciplina)' },
+  { id: 'fem_astrologa', label: 'Feminina astrologa (signos / horoscopo)' },
+  { id: 'masc_tecnologico', label: 'Masculino tech (early adopter / gadgets)' },
+  { id: 'fem_maternal', label: 'Feminina maternal (mae cuidadosa / familia)' },
+  { id: 'masc_esportivo', label: 'Masculino esportivo (torcedor / comentarista)' },
   { id: 'sem_persona', label: 'Sem persona definida' }
 ];
 
