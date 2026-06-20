@@ -435,12 +435,16 @@ Responda JSON: {"quizzes":[{"p1_index":1,"type":"texto","question":"","options":
       const onbMenus = p.onboardMenuCount != null ? p.onboardMenuCount : (p.onboardRoutes || 7);
       const seqMenus = p.seqMenuCount != null ? p.seqMenuCount : (p.seqRoutes || 3) * 7;
       const seqMapStr = p.seqMenuMap ? p.seqMenuMap.map(r => `rota ${r.route}=${r.menus} cards`).join(', ') : '';
+      const themeLine = p.fromOptimizer
+        ? `IMPORTANTE: baseie os prompts EXCLUSIVAMENTE no conteudo/tema do fluxo abaixo (ignore qualquer outro nicho). Conteudo real do fluxo enviado: "${p.niche}". As imagens devem refletir ESTE tema, nada alem disso.`
+        : `Tema/nicho: "${p.niche}".`;
       return `${ctx}
 Gere prompts de imagem (INGLES) na quantidade EXATA de cards de menu existentes. NAO invente cards a mais nem a menos.
+${themeLine}
 ONBOARD: EXATAMENTE ${onbMenus} prompts (so cards de menu; botoes nao tem imagem).
 SEQUENCIA: EXATAMENTE ${seqMenus} prompts no total.${seqMapStr ? ' Distribuicao real por rota: ' + seqMapStr + '. Gere os cards respeitando essa distribuicao (rota 1 com seus cards, rota 2 com os seus, etc).' : ''}
 NUNCA gere 10 por rota por padrao — use o numero real informado. Total sequencia = ${seqMenus}, total onboard = ${onbMenus}.
-Cada prompt descritivo, formato HORIZONTAL 1200x628 (formato de card de menu do Messenger, NUNCA vertical), conforme o nicho "${p.niche}". Todos os prompts DEVEM terminar com ", 1200x628 horizontal banner composition".
+Cada prompt descritivo, formato HORIZONTAL 1200x628 (formato de card de menu do Messenger, NUNCA vertical). Todos os prompts DEVEM terminar com ", 1200x628 horizontal banner composition".
 Responda JSON: {"onboard":[{"step":"onb1","prompt":"..."}],"sequence":[{"route":1,"step":"seq1-card1","prompt":"..."}]}. onboard com ${onbMenus} itens, sequence com ${seqMenus} itens.`;
     }
 

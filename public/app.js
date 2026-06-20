@@ -572,11 +572,14 @@ function optGenImages(flow,kind){
   var bd=menuBreakdown(flow);
   if(!bd.total){toast('Nenhum card de menu encontrado pra gerar imagens.');return}
   var isSeq=kind.toLowerCase().indexOf('sequ')>=0;
+  // infere o tema/nicho do PROPRIO fluxo otimizado (nao do campo do wizard, que pode ter outro nicho)
+  var inferredNiche=inferNicheFromFlow(flow);
   var params={
-    niche:$('#niche').value.trim()||'campanha',
-    flowLang:$('#flowLang')?$('#flowLang').value:'en-US',
-    contentLang:$('#contentLang')?$('#contentLang').value:'pt-BR',
+    niche:inferredNiche||'(tema do fluxo enviado)',
+    flowLang:'en-US',
+    contentLang:'pt-BR',
     personaLabel:'',
+    fromOptimizer:true,
     onboardMenuCount:isSeq?0:bd.total, onboardMenuMap:isSeq?[]:bd.map,
     seqMenuCount:isSeq?bd.total:0, seqMenuMap:isSeq?bd.map:[]
   };
@@ -592,6 +595,29 @@ function optGenImages(flow,kind){
     $('#oiSt').className='block-status done';$('#oiSt').textContent='✓ pronto';
     $('#oiBd').innerHTML='<div class="clean-view">'+sanitize('image_prompts',j,res.raw)+'</div>';
   }).catch(function(err){$('#oiSt').className='block-status error';$('#oiSt').textContent='✕ erro';$('#oiBd').innerHTML='<pre>ERRO: '+esc(err.message)+'</pre>'});
+}
+// extrai textos reais do fluxo (titulos de card, mensagens, botoes) pra inferir o tema
+function inferNicheFromFlow(flow){
+  var txt=[];
+  try{
+    if(flow.routes){ // chatdrink
+      flow.routes.forEach(function(r){(r.interactions||[]).forEach(function(it){
+        var c=it.config||{};
+        if(c.text)txt.push(c.text);
+        (c.cards||[]).forEach(function(cd){if(cd.title)txt.push(cd.title);if(cd.subtitle)txt.push(cd.subtitle);(cd.buttons||[]).forEach(function(b){if(b.label)txt.push(b.label)})});
+        if(c.title)txt.push(c.title);
+        (c.buttons||[]).forEach(function(b){if(b.label)txt.push(b.label)});
+        (c.quick_replies||[]).forEach(function(q){if(q.label)txt.push(q.label)});
+      })});
+    }else{ // chatfood
+      Object.keys(flow).forEach(function(k){((flow[k]&&flow[k].MESSAGES)||[]).forEach(function(m){
+        if(m.message&&m.message.text)txt.push(m.message.text);
+        (m.option||[]).forEach(function(o){if(o.title)txt.push(o.title);(o.option||[]).forEach(function(o2){if(o2.title)txt.push(o2.title)})});
+        if(m.title)txt.push(m.title);
+      })});
+    }
+  }catch(e){}
+  return txt.join(' | ').slice(0,1200);
 }
 function makeOptCard(){
   var c=document.createElement('div');c.className='block-card';
