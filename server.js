@@ -466,12 +466,23 @@ Responda JSON: {"onboard":[...],"sequence":[...]} preenchendo os esqueletos acim
 
     case 'creatives_prompt': {
       const plat = p.creativePlatform || 'svg_claude';
+      const imgOnly = p.creativeType === 'imagem';
+      const sz = p.creativeSize || '1080x1440';
+      const n = p.numCreatives || 20;
+      if (imgOnly) {
+        // apenas imagem: prompts limpos, SEM headline/cta, pra personalizar no Canva
+        return `${ctx}
+Gere EXATAMENTE ${n} prompts de IMAGEM (apenas a imagem de fundo, SEM texto, SEM headline, SEM CTA) para anuncios do nicho "${p.niche}" no idioma visual coerente, formato ${sz}.
+As imagens serao levadas pro Canva onde cada usuario adiciona o texto depois — entao NAO inclua texto na descricao da imagem, NAO descreva headline nem CTA. Apenas a cena/composicao visual, atmosferica e chamativa, com espaco/area limpa pra sobreposicao de texto depois.
+Plataforma de geracao: ${plat}. Cada prompt deve terminar com ", ${sz}, clean composition with space for text overlay, no text".
+Responda JSON: {"platform":"${plat}","size":"${sz}","type":"image_only","prompts":[{"index":1,"prompt":"..."}]} com EXATAMENTE ${n} itens, SEM campos headline/cta.`;
+      }
       if (plat === 'svg_claude') {
         return `${ctx}
-Gere um PROMPT completo para criar ${p.numCreatives || 20} criativos SVG de anuncio (${Math.ceil((p.numCreatives || 20) / 2)} animados SMIL + ${Math.floor((p.numCreatives || 20) / 2)} estaticos), formato ${p.creativeSize || '1080x1440'}, estilo gamificado (roleta, raspadinha, mystery box, placar fake) no idioma ${p.flowLang || 'en-US'}. Inclua regras tecnicas SMIL, paleta, headline, subtext, CTA e elemento visual de cada criativo. Responda JSON: {"prompt":"<markdown>"}`;
+Gere um PROMPT completo para criar ${n} criativos SVG de anuncio (${Math.ceil(n / 2)} animados SMIL + ${Math.floor(n / 2)} estaticos), formato ${sz}, estilo gamificado (raspadinha, mystery box, placar fake) no idioma ${p.flowLang || 'en-US'}. Inclua regras tecnicas SMIL, paleta, headline, subtext, CTA e elemento visual de cada criativo. Responda JSON: {"prompt":"<markdown>"}`;
       }
       return `${ctx}
-Gere ${p.numCreatives || 20} prompts de imagem para a plataforma ${plat} (formato ${p.creativeSize || '1080x1440'}) para anuncios do nicho "${p.niche}" no idioma ${p.flowLang || 'en-US'}. Estilo chamativo, gamificado quando possivel, com texto curto de headline e CTA descrito. Cada prompt pronto pra colar na ferramenta. Responda JSON: {"platform":"${plat}","size":"${p.creativeSize || '1080x1440'}","prompts":[{"index":1,"prompt":"...","headline":"...","cta":"..."}]}`;
+Gere ${n} prompts de imagem para a plataforma ${plat} (formato ${sz}) para anuncios do nicho "${p.niche}" no idioma ${p.flowLang || 'en-US'}. Estilo chamativo, gamificado quando possivel, COM texto curto de headline e CTA descrito. Cada prompt pronto pra colar na ferramenta. Responda JSON: {"platform":"${plat}","size":"${sz}","prompts":[{"index":1,"prompt":"...","headline":"...","cta":"..."}]}`;
     }
 
     case 'audios': {

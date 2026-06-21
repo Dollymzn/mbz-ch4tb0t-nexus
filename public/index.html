@@ -205,6 +205,16 @@
           </div>
 
           <div id="creativeOpts" class="creative-opts hidden">
+            <div class="creative-type-pick">
+              <label class="ctype-opt">
+                <input type="radio" name="creativeType" value="completo" checked>
+                <div class="ctype-box"><b>🎬 Criativo completo</b><span>Imagem + headline + CTA, pronto pra anúncio</span></div>
+              </label>
+              <label class="ctype-opt">
+                <input type="radio" name="creativeType" value="imagem">
+                <div class="ctype-box"><b>🖼️ Apenas imagem</b><span>Só prompts de imagem — você personaliza no Canva</span></div>
+              </label>
+            </div>
             <div class="card-grid">
               <div class="sel-card">
                 <label>Plataforma de geração</label>
@@ -218,7 +228,7 @@
                 <label>Quantidade</label>
                 <div class="stepper-ctrl"><button data-dec="numCreatives">−</button><input type="number" id="numCreatives" value="20" min="1" max="40"><button data-inc="numCreatives">+</button></div>
               </div>
-              <div class="sel-card">
+              <div class="sel-card" id="audioCard">
                 <label class="switch-inline"><input type="checkbox" id="wantAudios"><span class="slider"></span> Áudios ElevenLabs v3</label>
               </div>
             </div>

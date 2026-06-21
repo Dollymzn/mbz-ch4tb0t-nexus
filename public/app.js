@@ -140,6 +140,13 @@ function wireWizard(){
   $('#genFbPhotos').onclick=genFbPhotos;
   // creative toggle
   $('#wantCreatives').onchange=function(){$('#creativeOpts').classList.toggle('hidden',!this.checked);syncBlockToggles()};
+  $$('input[name=creativeType]').forEach(function(r){r.onchange=function(){
+    var imgOnly=document.querySelector('input[name=creativeType]:checked').value==='imagem';
+    // apenas imagem: esconde audio (sem headline/cta nao faz sentido audio casado)
+    $('#audioCard').style.display=imgOnly?'none':'';
+    if(imgOnly)$('#wantAudios').checked=false;
+    syncBlockToggles();
+  }});
   $('#imagePrompts').onchange=syncBlockToggles;
   $('#wantAudios').onchange=syncBlockToggles;
 }
@@ -251,6 +258,7 @@ function collectParams(){
     seqRoutes:+$('#seqRoutes').value,numP1:+$('#numP1').value,
     gridCols:+$('#gridCols').value,gridRows:+$('#gridRows').value,
     numCreatives:+$('#numCreatives').value,creativePlatform:$('#creativePlatform').value,creativeSize:$('#creativeSize').value,
+    creativeType:(document.querySelector('input[name=creativeType]:checked')||{}).value||'completo',
     imagePrompts:$('#imagePrompts').checked
   };
   return lastParams;
@@ -494,7 +502,15 @@ function sanitize(b,j,raw){
     }
     if(b==='creatives_prompt'){
       if(j.prompt)return '<pre>'+esc(j.prompt)+'</pre>';
-      if(j.prompts)return '<span class="tag">'+esc(j.platform||'')+' · '+esc(j.size||'')+'</span>'+j.prompts.map(function(p){return '<div class="kv"><b>#'+(p.index||'')+'</b> '+(p.headline?'<br><b>Headline:</b> '+esc(p.headline):'')+(p.cta?'<br><b>CTA:</b> '+esc(p.cta):'')+'<p>'+esc(p.prompt||'')+'</p></div>'}).join('');
+      if(j.prompts){
+        var imgOnly=j.type==='image_only';
+        var head='<span class="tag">'+esc(j.platform||'')+' · '+esc(j.size||'')+(imgOnly?' · APENAS IMAGEM':' · COMPLETO')+'</span>';
+        var ci=0;
+        return head+j.prompts.map(function(p){
+          var id='cp_'+(ci++);window._ipStore=window._ipStore||{};window._ipStore[id]=p.prompt||'';
+          return '<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>#'+(p.index||'')+'</b><button class="mini-btn ipcopy" data-ip="'+id+'">copiar</button></div>'+(p.headline?'<br><b>Headline:</b> '+esc(p.headline):'')+(p.cta?'<br><b>CTA:</b> '+esc(p.cta):'')+'<p>'+esc(p.prompt||'')+'</p></div>';
+        }).join('')+(setTimeout(bindIpCopy,0),'');
+      }
     }
     if(b==='audios'&&j.audios){
       return j.audios.map(function(a){return '<div class="kv"><span class="tag">#'+(a.index||'')+' · voz: '+esc(a.voice||'')+'</span><p>'+esc(a.script||'')+'</p></div>'}).join('');
