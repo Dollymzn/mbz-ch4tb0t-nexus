@@ -11,7 +11,7 @@ var $=function(s){return document.querySelector(s)}, $$=function(s){return [].sl
 // blocks meta: kind = 'json-download' (baixa .json) | 'text' (sanitiza pra leitura)
 var BLOCKS=[
   {id:'page_name',name:'Nome de Página',hint:'sugestão FB',kind:'text',def:true},
-  {id:'fb_images',name:'Fotos da Página',hint:'perfil + capa',kind:'text',def:false},
+  {id:'fb_images',name:'Página FB Completa',hint:'fotos + bio + post',kind:'text',def:false},
   {id:'onboard',name:'Onboard',hint:'JSON chatbot',kind:'json-download',def:true},
   {id:'sequence',name:'Sequência',hint:'JSON chatbot',kind:'json-download',def:true},
   {id:'comment',name:'Comentários',hint:'captação orgânica',kind:'json-download',def:false},
@@ -233,10 +233,10 @@ function genFbPhotos(e){
   if(!CFG.serverKey&&!USER_KEY){$('#keyModal').classList.remove('hidden');return}
   var btn=$('#genFbPhotos');btn.textContent='gerando...';
   collectParams();
-  var out=$('#fbPhotosOut');out.innerHTML='<div class="block-card"><div class="block-head"><span class="block-title">◢ Fotos da Página</span><span class="block-status loading"><span class="spinner"></span> gerando</span></div><div class="block-body" id="fbBd"></div></div>';
+  var out=$('#fbPhotosOut');out.innerHTML='<div class="block-card"><div class="block-head"><span class="block-title">◢ Página FB Completa</span><span class="block-status loading"><span class="spinner"></span> gerando</span></div><div class="block-body" id="fbBd"></div></div>';
   fetch('/api/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({block:'fb_images',params:lastParams,model:MODEL})})
   .then(function(r){return r.json()}).then(function(res){
-    btn.textContent='📸 Gerar prompts de perfil + capa';
+    btn.textContent='📸 Gerar fotos + bio + post';
     if(res.error){toast(res.error);out.innerHTML='';return}
     var j=res.json||safeParse(res.raw);
     window._fbImg=cleanText('fb_images',j,res.raw);
@@ -244,7 +244,7 @@ function genFbPhotos(e){
     $('#fbBd').parentNode.querySelector('.block-status').textContent='✓ pronto';
     $('#fbBd').innerHTML='<div class="clean-view">'+sanitize('fb_images',j,res.raw)+'<button class="mini-btn" id="fbCp" style="margin-top:10px">copiar prompts</button></div>';
     $('#fbCp').onclick=function(){navigator.clipboard.writeText(window._fbImg||'').then(function(){$('#fbCp').textContent='✓ copiado';setTimeout(function(){$('#fbCp').textContent='copiar prompts'},1400)})};
-  }).catch(function(){btn.textContent='📸 Gerar prompts de perfil + capa';out.innerHTML=''});
+  }).catch(function(){btn.textContent='📸 Gerar fotos + bio + post';out.innerHTML=''});
 }
 function authHeaders(){var h={'content-type':'application/json'};if(CFG.needPassword)h['x-access-pass']=ACCESS_PASS;if(!CFG.serverKey&&USER_KEY)h['x-user-key']=USER_KEY;return h}
 function collectParams(){
@@ -454,6 +454,8 @@ function sanitize(b,j,raw){
       var h='';
       if(j.profile)h+='<h4>📷 Foto de Perfil (1:1)</h4><div class="kv"><p>'+esc(j.profile.prompt||j.profile)+'</p></div>';
       if(j.cover)h+='<h4>🖼️ Foto de Capa (1640×856)</h4><div class="kv"><p>'+esc(j.cover.prompt||j.cover)+'</p></div>';
+      if(j.bio){var bl=(''+j.bio).length;h+='<h4>✍️ Bio <span style="color:'+(bl<=100?'var(--green)':'var(--pink)')+';font-size:11px">('+bl+'/100)</span></h4><div class="kv"><p>'+esc(j.bio)+'</p></div>';}
+      if(j.intro_post)h+='<h4>📢 Post de Apresentação</h4><div class="kv"><p style="white-space:pre-wrap">'+esc(j.intro_post)+'</p></div>';
       return h||'<pre>'+esc(JSON.stringify(j,null,2))+'</pre>';
     }
     if((b==='p1_titles'||b==='p2_titles')&&j.titles) return olist(j.titles);
@@ -557,7 +559,7 @@ function cleanText(b,j,raw){
   if(!j)return raw||'';
   try{
     if(b==='page_name'&&j.names)return j.names.join('\n');
-    if(b==='fb_images')return 'FOTO DE PERFIL:\n'+((j.profile&&(j.profile.prompt||j.profile))||'')+'\n\nFOTO DE CAPA:\n'+((j.cover&&(j.cover.prompt||j.cover))||'');
+    if(b==='fb_images')return 'FOTO DE PERFIL:\n'+((j.profile&&(j.profile.prompt||j.profile))||'')+'\n\nFOTO DE CAPA:\n'+((j.cover&&(j.cover.prompt||j.cover))||'')+(j.bio?'\n\nBIO:\n'+j.bio:'')+(j.intro_post?'\n\nPOST DE APRESENTAÇÃO:\n'+j.intro_post:'');
     if((b==='p1_titles'||b==='p2_titles')&&j.titles)return j.titles.map(function(t,i){return (i+1)+'. '+t}).join('\n');
     if(b==='meta_copy')return 'TEXTOS:\n'+(j.primary_texts||[]).map(function(t,i){return (i+1)+'. '+t}).join('\n\n')+'\n\nTÍTULOS:\n'+(j.headlines||[]).join('\n')+'\n\nDESCRIÇÃO:\n'+(j.description||'');
     if(b==='meta_onboard')return 'BOAS-VINDAS:\n'+(j.welcome||'')+'\n\nQUICK REPLIES:\n'+(j.quick_replies||[]).join('\n')+'\n\nFOLLOW-UP:\n'+(j.followup||'');

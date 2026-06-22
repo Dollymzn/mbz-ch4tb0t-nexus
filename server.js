@@ -334,7 +334,11 @@ A persona deve ser uma PESSOA REAL coerente com o nome, etnia e cultura do pais-
 - Mencione o pais-alvo no cenario quando fizer sentido (paisagem, bandeira sutil, clima).
 Termine o prompt da capa com ", 1640x856 horizontal Facebook cover banner, cinematic premium composition, ultra detailed, elegant typography layout".
 
-Responda JSON: {"profile":{"prompt":"..."},"cover":{"prompt":"..."}}`;
+3) BIO (bio): uma bio curta de pagina, NO MAXIMO 100 caracteres, no IDIOMA DA CAMPANHA (${p.campaignLang || p.contentLang || 'en-US'}), na voz da persona ${p.personaLabel}, capturando a essencia do nicho com um toque de curiosidade/acolhimento. Conte os caracteres — nao passe de 100.
+
+4) POST DE APRESENTACAO (intro_post): um primeiro post de boas-vindas da pagina, no IDIOMA DA CAMPANHA (${p.campaignLang || p.contentLang || 'en-US'}), na voz da persona, apresentando quem ela e, o que a pagina oferece e um convite/CTA suave pra seguir e interagir. Use emojis, quebras de linha, tom autentico e caloroso (3 a 6 linhas).
+
+Responda JSON: {"profile":{"prompt":"..."},"cover":{"prompt":"..."},"bio":"<ate 100 chars>","intro_post":"<post de apresentacao>"}`;
 
     case 'comment':
       if ((p.platform || 'chatdrink') === 'chatfood') {
