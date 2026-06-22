@@ -472,13 +472,26 @@ function sanitize(b,j,raw){
       return h;
     }
     if(b==='quiz'&&j.quizzes){
+      var qpi=0;
       return j.quizzes.map(function(q,i){
         var h='<div class="kv"><span class="tag">QUIZ '+(q.p1_index||i+1)+' · '+esc(q.type||'')+'</span>';
         h+='<h4>'+esc(q.question||'')+'</h4>';
-        if(q.options)h+=ulist(q.options.map(function(o){return o.label+(o.pinterest?'  ·  📌 '+o.pinterest:'')}));
+        if(q.options){
+          var hasPin=q.options.some(function(o){return o.pinterest});
+          if(hasPin){
+            // quiz visual: cada opcao com termo Pinterest clicavel + copiar
+            h+='<div style="display:flex;flex-direction:column;gap:6px;margin:6px 0">'+q.options.map(function(o){
+              var pin=o.pinterest||'';var url='https://www.pinterest.com/search/pins/?q='+encodeURIComponent(pin);
+              var id='qp_'+(qpi++);window._ipStore=window._ipStore||{};window._ipStore[id]=pin;
+              return '<div style="border-left:2px solid var(--purple);padding-left:10px"><b>'+esc(o.label||'')+'</b>'+(pin?'<br><span class="pin">📌 '+esc(pin)+'</span> <a href="'+esc(url)+'" target="_blank" style="color:var(--cyan);font-size:11px">abrir ↗</a> <button class="mini-btn ipcopy" data-ip="'+id+'" style="padding:2px 8px;font-size:10px">copiar</button>':'')+'</div>';
+            }).join('')+'</div>';
+          }else{
+            h+=ulist(q.options.map(function(o){return o.label}));
+          }
+        }
         h+='<p><b>Loading:</b> '+esc(q.loading||'')+'<br><b>Final:</b> '+esc(q.final_title||'')+'<br><b>CTA:</b> '+esc(q.cta||'')+'<br><b>Nota:</b> '+esc(q.note||'')+'</p></div>';
         return h;
-      }).join('');
+      }).join('')+(setTimeout(bindIpCopy,0),'');
     }
     if(b==='image_prompts'){
       var h='';var pi=0;
