@@ -70,6 +70,7 @@ const PERSONAS = [
   { id: 'fem_mistica', label: 'Feminina mistica (vidente / cartomante)' },
   { id: 'fem_romantica', label: 'Feminina romantica (apaixonada)' },
   { id: 'masc_financeiro', label: 'Masculino financeiro (consultor de credito)' },
+  { id: 'fem_financeira', label: 'Feminina financeira (consultora de credito)' },
   { id: 'fem_beauty', label: 'Feminina beauty (especialista em beleza)' },
   { id: 'neutro_amigo', label: 'Neutro amigavel (assistente proximo)' },
   { id: 'fem_crista', label: 'Feminina crista (fe / mensagem de Deus)' },
