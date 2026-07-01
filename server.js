@@ -182,6 +182,88 @@ function fixButtonsUtm(buttons, src, content) {
   });
 }
 
+// ---- Monta o JSON completo do quiz-overlay (52 campos) a partir do conteudo da IA ----
+function assembleQuizOverlays(j, nslug) {
+  if (!j || !Array.isArray(j.quizzes)) return j;
+  const VALID_MODES = ['quiz','wheel','visual','hold','scratch','countdown','flip','gift','tap','trivia'];
+  const VALID_PAL = ['sunset','mint','royal','slate','pink','purple','bordo','passion','mystic','romance','angel','ocean','forest','neon','aurora','secret','luxury','candy','arcade','zen'];
+  const overlays = j.quizzes.map((q, i) => {
+    const mode = VALID_MODES.indexOf(q.entry_mode) >= 0 ? q.entry_mode : 'wheel';
+    const pal = VALID_PAL.indexOf(q.theme_palette) >= 0 ? q.theme_palette : 'mystic';
+    const qOpts = q.quiz_options || ['Sim','Talvez','Não'];
+    const vOpts = (q.visual_options || []).map(o => ({
+      label: o.label || '',
+      // converte pinterest search -> link de pesquisa do Pinterest
+      image: o.pinterest ? 'https://www.pinterest.com/search/pins/?q=' + encodeURIComponent(o.pinterest) : (o.image || '')
+    }));
+    const wheelOpts = q.wheel_options && q.wheel_options.length ? q.wheel_options : ['Prêmio 1','Prêmio 2','Prêmio 3','Prêmio 4','Prêmio 5','Prêmio 6'];
+    return {
+      id: q.id || (nslug + '-' + (i + 1)),
+      entry_mode: mode,
+      questions: (q.quiz_question || '') + ' | ' + qOpts.join(' | '),
+      qlist: [{ title: q.quiz_question || '', options: qOpts }],
+      cooldown_min: 0,
+      open_delay_ms: 2000,
+      require_completion: true,
+      ad_mode: 'rewarded',
+      wheel_options: wheelOpts,
+      wheel_fixed_index: '0',
+      wheel_title: q.wheel_title || '',
+      wheel_result_label: q.wheel_result_label || '',
+      visual_questions: [{ title: q.visual_question || '', options: vOpts }],
+      hold_visual: q.hold_visual || 'envelope',
+      hold_duration: 1.5,
+      hold_title: q.hold_title || '',
+      hold_subtitle: q.hold_subtitle || '',
+      hold_instruction: q.hold_instruction || '',
+      hold_emoji: q.hold_emoji || '💌',
+      scratch_title: q.scratch_title || '',
+      scratch_prize: q.scratch_prize || '',
+      scratch_cover_color: q.scratch_cover_color || '#2b1f3d',
+      scratch_threshold: 40,
+      scratch_hint: q.scratch_hint || '',
+      scratch_subtext: q.scratch_subtext || '',
+      countdown_from: 3,
+      countdown_title: q.countdown_title || '',
+      countdown_reveal: q.countdown_reveal || '',
+      countdown_subtext: q.countdown_subtext || '',
+      flip_title: q.flip_title || '',
+      flip_front_text: q.flip_front_text || '🔒 Toque para virar',
+      flip_prize: q.flip_prize || '',
+      flip_emoji: q.flip_emoji || '✉️',
+      gift_title: q.gift_title || '',
+      gift_prize: q.gift_prize || '',
+      gift_emoji: q.gift_emoji || '🎁',
+      gift_btn_label: q.gift_btn_label || 'Abrir Presente',
+      tap_count: 5,
+      tap_title: q.tap_title || '',
+      tap_label: q.tap_label || 'Toque para abrir',
+      tap_complete_text: q.tap_complete_text || '',
+      trivia_question: q.trivia_question || '',
+      trivia_options: q.trivia_options || ['Sim','Talvez','Não','Agora'],
+      trivia_correct_index: 0,
+      trivia_wrong_text: q.trivia_wrong_text || '',
+      final_cta_label: q.final_cta_label || 'Ver agora →',
+      final_cta_url: '',
+      finish_title: q.finish_title || '',
+      finish_note: q.finish_note || '',
+      loading_text: q.loading_text || '',
+      loading_ms: 1600,
+      theme_palette: pal
+    };
+  });
+  // retorna no formato: cada overlay é um export completo do plugin
+  return {
+    quizzes: overlays.map(ov => ({
+      plugin: 'quiz-overlay',
+      schema_version: 1,
+      plugin_version: '4.1.0',
+      exported_at: new Date().toISOString(),
+      overlay: ov
+    }))
+  };
+}
+
 // ---- Garante legibilidade do MIRB grid: anexa CSS de contraste que SEMPRE vence ----
 function enforceGridLegibility(j, params) {
   if (!j || !j.grid) return j;
@@ -246,6 +328,7 @@ app.post('/api/generate', async (req, res) => {
     }
     // garante legibilidade do grid: injeta CSS de contraste obrigatório
     if (json && block === 'grid') fixedJson = enforceGridLegibility(json, params);
+    if (json && block === 'quiz') fixedJson = assembleQuizOverlays(json, nslug);
     res.json({ block, raw: fixedJson ? JSON.stringify(fixedJson, null, 2) : text, json: fixedJson, ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -348,9 +431,19 @@ Apenas WELCOME com UMA mensagem type:"text": message.text instigante (curto, emo
 Responda APENAS o JSON valido no formato exato do ChatFood comment.`;
       }
       return `${ctx}
-Gere o FLUXO DE COMENTARIOS ChatDrink (captacao de lead organico via comentarios em posts).
-type:"comment", uma unica rota route_0 com UMA interaction "mensagem": text instigante da persona ${p.personaLabel} (fala de algo que o lead vai descobrir/receber, gera curiosidade) no idioma ${p.flowLang || 'en-US'}, + ${p.commentOptions || 5} quick_replies (label com emoji + texto curto, action_type:"route", target_route:"", target_flow:""). Inclua o bloco comment_trigger:{"reply_public":false,"reply_public_text":"","active":true}.
-Responda APENAS o JSON valido no formato exato do ChatDrink comment.`;
+Gere o FLUXO DE COMENTARIOS ChatDrink (captacao de lead organico via comentarios em posts), no FORMATO NOVO.
+Estrutura EXATA:
+{
+  "name":"COMENTARIOS <NICHO>","type":"comment","active":true,
+  "is_master":false,"master_flow_id":null,"locale":null,"translate_status":null,
+  "routes":[{"id":"route_0","name":"Rota 1","sort_order":0,"color":null,"interactions":[{"type":"mensagem","config":{
+    "text":"<abertura instigante da persona ${p.personaLabel}, com emojis, gera curiosidade, termina com 👇>",
+    "quick_replies":[ {"label":"<emoji + texto curto>","action_type":"route","target_route":"","target_flow":""} (${p.commentOptions || 5} quick_replies) ]
+  },"sort_order":0}]}],
+  "comment_trigger":{"reply_public":true,"reply_public_text":"<resposta publica curta da persona pro comentario, dizendo que mandou DM/inbox, com emoji — gera prova social no post>","active":true}
+}
+Idioma ${p.flowLang || 'en-US'}. O reply_public_text e a resposta PUBLICA automatica no comentario (ex: "Just sent you a DM! 💕 Check your inbox ✨").
+Responda APENAS o JSON valido nesse formato exato.`;
 
     case 'onboard': {
       const nr = p.onboardRoutes || 7;
@@ -422,12 +515,40 @@ Gere exatamente ${p.gridCols * p.gridRows} items com item_order incremental.`;
     case 'p2_titles':
       return `${ctx}\nGere ${p.gridCols * p.gridRows} titulos de P2 (um por item do grid) no idioma ${p.contentLang}, focados em "como obter/saber mais". ${p.currency !== 'USD' ? 'Moeda ' + p.currency + '.' : ''}\nResponda JSON: {"titles":["..."]} com exatamente ${p.gridCols * p.gridRows} titulos.`;
 
-    case 'quiz':
+    case 'quiz': {
+      const palettes = ['sunset','mint','royal','slate','pink','purple','bordo','passion','mystic','romance','angel','ocean','forest','neon','aurora','secret','luxury','candy','arcade','zen'];
       return `${ctx}
-Gere ${p.numP1} quiz overlays (UM por P1) no idioma ${p.contentLang}.
-Tipos: APENAS "texto" (quiz padrao com opcoes em texto) ou "visual" (opcoes com imagem). NUNCA use "roleta" ou qualquer outro tipo. Varie entre texto e visual conforme cada P1.
-Cada quiz: pergunta, opcoes (3-4; se visual incluir pinterest EN por opcao), loading, titulo final, cta, nota. ${p.currency !== 'USD' ? 'Moeda ' + p.currency + '.' : ''}
-Responda JSON: {"quizzes":[{"p1_index":1,"type":"texto","question":"","options":[{"label":"","pinterest":""}],"loading":"","final_title":"","cta":"","note":""}]}`;
+Gere ${p.numP1} quiz overlays (UM por P1) no idioma ${p.contentLang}, no formato do plugin quiz-overlay 4.1.0.
+Cada overlay preenche TODOS os 10 modos de entrada, mas voce escolhe UM como sugerido (entry_mode) que combine melhor com o nicho.
+Modos disponiveis (entry_mode): "quiz","wheel","visual","hold","scratch","countdown","flip","gift","tap","trivia".
+Paletas (theme_palette): ${palettes.join(', ')}. Escolha a que combina com o nicho (ex: secret/mystic/romance pra carta de amor; angel pra fe; luxury pra financas; candy/arcade pra jovem).
+IMPORTANTE no modo visual: cada opcao tem "pinterest" = string de busca do Pinterest em INGLES (o sistema converte no link).
+${p.currency !== 'USD' ? 'Moeda ' + p.currency + ' se citar valores.' : ''}
+
+Para CADA overlay responda com estes campos de CONTEUDO (o resto da estrutura o sistema monta):
+{
+ "p1_index":1,
+ "id":"<slug-curto>",
+ "entry_mode":"<um dos 10 modos, o mais adequado>",
+ "theme_palette":"<uma paleta>",
+ "quiz_question":"<pergunta do quiz padrao>",
+ "quiz_options":["op1","op2","op3"],
+ "wheel_options":["6 rotulos curtos tematicos"],
+ "wheel_title":"<titulo da roleta>",
+ "wheel_result_label":"<label do resultado>",
+ "visual_question":"<pergunta visual>",
+ "visual_options":[{"label":"emoji + texto","pinterest":"EN search"},{"label":"emoji + texto","pinterest":"EN search"}],
+ "hold_visual":"envelope","hold_title":"","hold_subtitle":"","hold_instruction":"","hold_emoji":"💌",
+ "scratch_title":"","scratch_prize":"","scratch_hint":"","scratch_subtext":"","scratch_cover_color":"#2b1f3d",
+ "countdown_title":"","countdown_reveal":"","countdown_subtext":"",
+ "flip_title":"","flip_front_text":"","flip_prize":"","flip_emoji":"✉️",
+ "gift_title":"","gift_prize":"","gift_emoji":"🎁","gift_btn_label":"",
+ "tap_title":"","tap_label":"","tap_complete_text":"",
+ "trivia_question":"","trivia_options":["op1","op2","op3","op4"],"trivia_wrong_text":"",
+ "final_cta_label":"<CTA final com seta>","finish_title":"","finish_note":"","loading_text":""
+}
+Responda JSON: {"quizzes":[ ...${p.numP1} overlays... ]}`;
+    }
 
     case 'meta_copy':
       return `${ctx}\nGere copy do Meta Ads no IDIOMA DA CAMPANHA (${p.campaignLang || p.contentLang || 'pt-BR'}) usando moeda ${p.currency}: 5 textos principais (clickbait, emojis, quebras), 5 titulos curtos, 1 descricao. A copy DEVE estar no idioma da campanha (GEO alvo), nao no idioma do blog.\nResponda JSON: {"primary_texts":["..."],"headlines":["..."],"description":"..."}`;

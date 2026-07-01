@@ -31,16 +31,17 @@ URLs sequencia: {{URL_REDIR}}?utm_source=sequence&utm_campaign={{UTM_CAMPAIGN}}&
 URLs onboard: {{URL_REDIR}}?utm_source=onboard&utm_campaign={{UTM_CAMPAIGN}}&utm_medium={{NOMEDAPAGINA}}&utm_term=onboard&utm_content=onb1-<nicho>
 Variaveis: {{FIRST_NAME}}, {{URL_REDIR}}, {{UTM_CAMPAIGN}}, {{NOMEDAPAGINA}}
 
-FLUXO DE COMENTARIOS CHATDRINK (captacao de lead organico via comentarios):
+FLUXO DE COMENTARIOS CHATDRINK (captacao de lead organico via comentarios) - FORMATO NOVO:
 { "name":"<Nome>", "type":"comment", "active":true,
+  "is_master":false, "master_flow_id":null, "locale":null, "translate_status":null,
   "routes":[ { "id":"route_0","name":"Rota 1","sort_order":0,"color":null,
     "interactions":[ { "type":"mensagem","config":{
-      "text":"<mensagem de abertura da persona, instigante, fala de algo que o lead vai receber/descobrir>",
-      "buttons":[],
-      "quick_replies":[ {"label":"<emoji + texto curto>","action_type":"route","target_route":"","target_flow":""} (5 quick_replies) ],
-      "redirect_type":"","redirect_target":"" }, "sort_order":0 } ] } ],
-  "comment_trigger":{"reply_public":false,"reply_public_text":"","active":true} }
-- E SO uma rota, com UMA mensagem + 5 quick_replies. NAO tem menu/delay/botoes. O target_route/target_flow ficam vazios (o usuario liga no painel).
+      "text":"<mensagem de abertura da persona, instigante, com emojis, termina com 👇>",
+      "quick_replies":[ {"label":"<emoji + texto curto>","action_type":"route","target_route":"","target_flow":""} (5 quick_replies) ]
+    }, "sort_order":0 } ] } ],
+  "comment_trigger":{"reply_public":true,"reply_public_text":"<resposta publica automatica no comentario, ex: mandei DM, checa o inbox>","active":true} }
+- SO uma rota, UMA mensagem + 5 quick_replies. target_route/target_flow vazios (usuario liga no painel).
+- reply_public:true = a pagina responde PUBLICAMENTE o comentario (prova social). reply_public_text e essa resposta.
 `;
 
 const CHATFOOD_FORMAT = `

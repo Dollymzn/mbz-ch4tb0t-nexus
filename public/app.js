@@ -475,25 +475,24 @@ function sanitize(b,j,raw){
     }
     if(b==='quiz'&&j.quizzes){
       var qpi=0;
-      return j.quizzes.map(function(q,i){
-        var h='<div class="kv"><span class="tag">QUIZ '+(q.p1_index||i+1)+' · '+esc(q.type||'')+'</span>';
-        h+='<h4>'+esc(q.question||'')+'</h4>';
-        if(q.options){
-          var hasPin=q.options.some(function(o){return o.pinterest});
-          if(hasPin){
-            // quiz visual: cada opcao com termo Pinterest clicavel + copiar
-            h+='<div style="display:flex;flex-direction:column;gap:6px;margin:6px 0">'+q.options.map(function(o){
-              var pin=o.pinterest||'';var url='https://www.pinterest.com/search/pins/?q='+encodeURIComponent(pin);
-              var id='qp_'+(qpi++);window._ipStore=window._ipStore||{};window._ipStore[id]=pin;
-              return '<div style="border-left:2px solid var(--purple);padding-left:10px"><b>'+esc(o.label||'')+'</b>'+(pin?'<br><span class="pin">📌 '+esc(pin)+'</span> <a href="'+esc(url)+'" target="_blank" style="color:var(--cyan);font-size:11px">abrir ↗</a> <button class="mini-btn ipcopy" data-ip="'+id+'" style="padding:2px 8px;font-size:10px">copiar</button>':'')+'</div>';
-            }).join('')+'</div>';
-          }else{
-            h+=ulist(q.options.map(function(o){return o.label}));
-          }
+      window._quizStore=j.quizzes;
+      return j.quizzes.map(function(item,i){
+        var ov=item.overlay||item;
+        var h='<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="tag">QUIZ '+(i+1)+' · modo: '+esc(ov.entry_mode||'')+' · paleta: '+esc(ov.theme_palette||'')+'</span><button class="mini-btn dl qdl" data-qi="'+i+'">⬇ .json</button></div>';
+        h+='<h4>'+esc((ov.qlist&&ov.qlist[0]&&ov.qlist[0].title)||'')+'</h4>';
+        // opcoes visuais com pinterest
+        var vq=ov.visual_questions&&ov.visual_questions[0];
+        if(vq&&vq.options&&vq.options.length){
+          h+='<p style="color:var(--purple);font-size:12px;margin:6px 0 2px">Modo visual:</p><div style="display:flex;flex-direction:column;gap:5px;margin-bottom:6px">'+vq.options.map(function(o){
+            var img=o.image||'';var isPin=img.indexOf('pinterest.com')>=0;
+            return '<div style="border-left:2px solid var(--purple);padding-left:10px"><b>'+esc(o.label||'')+'</b>'+(img?'<br><a href="'+esc(img)+'" target="_blank" style="color:var(--cyan);font-size:11px">'+(isPin?'🔍 buscar no Pinterest ↗':'ver imagem ↗')+'</a>':'')+'</div>';
+          }).join('')+'</div>';
         }
-        h+='<p><b>Loading:</b> '+esc(q.loading||'')+'<br><b>Final:</b> '+esc(q.final_title||'')+'<br><b>CTA:</b> '+esc(q.cta||'')+'<br><b>Nota:</b> '+esc(q.note||'')+'</p></div>';
+        // resumo dos modos preenchidos
+        h+='<p style="font-size:12px;color:var(--muted)"><b>Roleta:</b> '+esc(ov.wheel_title||'')+'<br><b>CTA final:</b> '+esc(ov.final_cta_label||'')+'<br><b>Loading:</b> '+esc(ov.loading_text||'')+'</p>';
+        h+='</div>';
         return h;
-      }).join('')+(setTimeout(bindIpCopy,0),'');
+      }).join('')+(setTimeout(bindQuizDl,0),'');
     }
     if(b==='image_prompts'){
       var h='';var pi=0;
@@ -563,7 +562,7 @@ function cleanText(b,j,raw){
     if((b==='p1_titles'||b==='p2_titles')&&j.titles)return j.titles.map(function(t,i){return (i+1)+'. '+t}).join('\n');
     if(b==='meta_copy')return 'TEXTOS:\n'+(j.primary_texts||[]).map(function(t,i){return (i+1)+'. '+t}).join('\n\n')+'\n\nTÍTULOS:\n'+(j.headlines||[]).join('\n')+'\n\nDESCRIÇÃO:\n'+(j.description||'');
     if(b==='meta_onboard')return 'BOAS-VINDAS:\n'+(j.welcome||'')+'\n\nQUICK REPLIES:\n'+(j.quick_replies||[]).join('\n')+'\n\nFOLLOW-UP:\n'+(j.followup||'');
-    if(b==='quiz'&&j.quizzes)return j.quizzes.map(function(q,i){return 'QUIZ '+(q.p1_index||i+1)+' ('+(q.type||'')+')\nPergunta: '+(q.question||'')+'\nOpções: '+(q.options||[]).map(function(o){return o.label}).join(' | ')+'\nLoading: '+(q.loading||'')+'\nFinal: '+(q.final_title||'')+'\nCTA: '+(q.cta||'')+'\nNota: '+(q.note||'')}).join('\n\n');
+    if(b==='quiz'&&j.quizzes)return JSON.stringify(j.quizzes.length===1?j.quizzes[0]:j.quizzes,null,2);
     if(b==='creatives_prompt'&&j.prompt)return j.prompt;
     if(b==='creatives_prompt'&&j.prompts)return j.prompts.map(function(p){return '#'+p.index+' '+(p.headline||'')+'\n'+p.prompt+'\nCTA: '+(p.cta||'')}).join('\n\n');
     if(b==='audios'&&j.audios)return j.audios.map(function(a){return '#'+a.index+' ['+a.voice+']\n'+a.script}).join('\n\n');
@@ -714,6 +713,19 @@ function wireKeyModal(){
 
 /* ---------- utils ---------- */
 function safeParse(t){if(!t)return null;try{return JSON.parse(t)}catch(e){}var f=t.indexOf('{'),fa=t.indexOf('[');var s=f<0?fa:fa<0?f:Math.min(f,fa);if(s<0)return null;var l=Math.max(t.lastIndexOf('}'),t.lastIndexOf(']'));if(l>s){try{return JSON.parse(t.slice(s,l+1))}catch(e){}}return null}
+function bindQuizDl(){
+  $$('.qdl').forEach(function(btn){
+    if(btn._bound)return;btn._bound=true;
+    btn.onclick=function(e){
+      e.stopPropagation();
+      var qi=+btn.getAttribute('data-qi');var item=(window._quizStore||[])[qi];if(!item)return;
+      var ov=item.overlay||item;var name=(ov.id||'quiz-'+(qi+1));
+      var blob=new Blob([JSON.stringify(item,null,2)],{type:'application/json'});
+      var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='qo-'+name+'.json';a.click();URL.revokeObjectURL(a.href);
+      toast('Baixado: qo-'+name+'.json');
+    };
+  });
+}
 function bindIpCopy(){
   $$('.ipcopy').forEach(function(btn){
     if(btn._bound)return;btn._bound=true;
