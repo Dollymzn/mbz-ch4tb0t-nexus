@@ -21,7 +21,7 @@ REGRA DE OURO DO ONBOARD CHATDRINK (SIGA EXATAMENTE - NAO INVENTE):
 - routes[0] = SO random: {"id":"route_0","name":"Rota 1","sort_order":0,"color":null,"interactions":[{"type":"random","config":{"routes":[]},"sort_order":0}]}
 - Cada rota de conteudo (route_1...route_N-1) e ISOLADA e tem EXATAMENTE 2 interactions: [digitando, (menu OU botoes)]. NUNCA use "mensagem" no onboard. NUNCA use quick_replies no onboard.
   * digitando: config {"duration":3,"redirect_type":"","redirect_target":""}
-  * menu: config {"cards":[{"title","subtitle","image_url":"https://via.placeholder.com/1200x628","buttons":[{"label","action_type":"url","url","urls":[{"url","weight":100}]}]}],"redirect_type":"route","redirect_target":9999}
+  * menu: config {"cards":[{"title","subtitle","image_url":"https://placehold.co/1200x628","buttons":[{"label","action_type":"url","url","urls":[{"url","weight":100}]}]}],"redirect_type":"route","redirect_target":9999}
   * botoes: config {"title","buttons":[{"label","action_type":"url","url","urls":[{"url","weight":100}]}],"redirect_type":"route","redirect_target":9999}
 - TODAS as rotas de conteudo redirecionam pro MESMO destino: a ULTIMA rota (use redirect_target:9999 como placeholder do id da ultima rota). NUNCA uma rota de conteudo aponta pra outra rota de conteudo. Sem cadeia entre elas - cada uma e um beco isolado que cai na ultima.
 - A ULTIMA rota tem SO o goto, NADA mais: {"id":"route_N","name":"Rota N+1","sort_order":N,"color":null,"interactions":[{"type":"goto","config":{"target_type":"flow","target_route":"","target_flow":"433"},"sort_order":0}]}
@@ -42,23 +42,6 @@ FLUXO DE COMENTARIOS CHATDRINK (captacao de lead organico via comentarios) - FOR
   "comment_trigger":{"reply_public":true,"reply_public_text":"<resposta publica automatica no comentario, ex: mandei DM, checa o inbox>","active":true} }
 - SO uma rota, UMA mensagem + 5 quick_replies. target_route/target_flow vazios (usuario liga no painel).
 - reply_public:true = a pagina responde PUBLICAMENTE o comentario (prova social). reply_public_text e essa resposta.
-`;
-
-const CHATFOOD_FORMAT = `
-PLATAFORMA CHATFOOD — formato JSON (DIFERENTE do ChatDrink):
-{ "WELCOME":{"MESSAGES":[{"format":"action","type":"random","options":[{"action":"ROUTE_2"}]}]}, "ROUTE_N":{"MESSAGES":[...]} }
-- Sequencia ChatFood: cada ROUTE_N e jornada completa. Em MESSAGES intercale:
-  * delay: { "format":"action","type":"delay","seconds":<int>,"timeUnit":"hours" }
-  * card: { "format":"message","type":"simple_menu","option":[{"option":[{"option":[],"type":"url","title":"<botao>","urls":[{"url":"<url>","weight":100}]}],"image":"<url>","title":"<titulo>","subtitle":"<sub>"}] }
-  * mensagem: { "format":"message","type":"buttons_menu","option":[{"option":[],"type":"url","urls":[{"url":"<url>","weight":100}],"title":"<botao>"}],"redirect":"ROUTE_X","title":"<texto persona>" }
-- Se pede N sequencias, crie N rotas no WELCOME.random, cada ROUTE_N completa.
-- ONBOARD ChatFood: WELCOME random -> cada ROUTE_N = simple_menu (card) + buttons_menu (mensagem+botao) com "redirect".
-
-FLUXO DE COMENTARIOS CHATFOOD (captacao de lead organico):
-{ "WELCOME":{ "MESSAGES":[ { "format":"message","type":"text","message":{
-  "option":[ {"title":"<emoji + texto curto MAIUSCULO>","type":"redirect","option":[],"action":""} (3 a 5 opcoes) ],
-  "text":"<texto curto instigante + emoji + 👇>" } } ] } }
-- SO o WELCOME, com UMA mensagem type:"text", message.text + message.option[] (botoes redirect). action vazio (usuario liga no painel).
 `;
 
 const PERSONAS = [
@@ -155,11 +138,11 @@ REGRAS:
 `;
 
 function buildSystemPrompt() {
-  return OPERATION_KNOWLEDGE + "\n\n" + CHATDRINK_FORMAT + "\n\n" + CHATFOOD_FORMAT +
+  return OPERATION_KNOWLEDGE + "\n\n" + CHATDRINK_FORMAT +
     "\n\nIMPORTANTE: responda SEMPRE so com JSON valido conforme o schema pedido, sem texto fora do JSON, sem markdown, sem crases. Use aspas duplas. Nao trunque. Feche todas as chaves e colchetes.";
 }
 
 module.exports = {
   PERSONAS, LANGUAGES, CURRENCIES, COUNTRIES, CREATIVE_PLATFORMS, CREATIVE_SIZES,
-  buildSystemPrompt, CHATDRINK_FORMAT, CHATFOOD_FORMAT
+  buildSystemPrompt, CHATDRINK_FORMAT
 };

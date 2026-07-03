@@ -141,18 +141,6 @@
           <h2 class="step-title">Estrutura do funil</h2>
           <p class="step-help">Defina a plataforma e o tamanho de cada peça. As P2 são calculadas pelo formato do grid.</p>
 
-          <div class="platform-pick">
-            <label class="platform-opt">
-              <input type="radio" name="platform" value="chatdrink" checked>
-              <div class="platform-box"><b>ChatDrink</b><span>proprietário · sem limite de páginas</span></div>
-            </label>
-            <label class="platform-opt">
-              <input type="radio" name="platform" value="chatfood">
-              <div class="platform-box"><b>ChatFood</b><span>multi-idioma · limite de páginas</span></div>
-            </label>
-          </div>
-          <div class="warn-strip">⚠️ ChatDrink e ChatFood usam formatos JSON diferentes. A ferramenta gera o correto pra plataforma escolhida.</div>
-
           <div class="steppers">
             <div class="stepper">
               <label>Rotas no onboard</label>
@@ -240,6 +228,7 @@
           <div class="step-eyebrow">PASSO 5 / 5</div>
           <h2 class="step-title">O que gerar?</h2>
           <p class="step-help">Marque só o que precisa. Se já tem onboard e sequência prontos, desmarque e gere apenas o resto.</p>
+          <div class="preset-bar" id="presetBar"></div>
           <div class="block-pick" id="blockPick"></div>
           <div class="summary" id="summary"></div>
         </div>
@@ -287,14 +276,6 @@
         </select>
       </div>
       <div class="sel-card">
-        <label>Plataforma (se for JSON de chatbot)</label>
-        <select id="optPlatform">
-          <option value="">— não aplicável —</option>
-          <option value="chatdrink">ChatDrink</option>
-          <option value="chatfood">ChatFood</option>
-        </select>
-      </div>
-      <div class="sel-card">
         <label>Modelo IA</label>
         <select id="optModel" class="model-select"></select>
       </div>
@@ -321,7 +302,7 @@
     <div id="historyList" class="history-list"></div>
   </section>
 
-  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v2.0 · <span id="modelFoot"></span></footer>
+  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v3.0 · <span id="modelFoot"></span></footer>
 </div>
 
 <!-- ===== API KEY MODAL ===== -->
@@ -341,6 +322,6 @@
 <!-- ===== TOAST ===== -->
 <div id="toast" class="toast"></div>
 
-<script src="app.js"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
