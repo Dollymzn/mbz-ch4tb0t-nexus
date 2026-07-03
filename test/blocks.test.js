@@ -89,3 +89,14 @@ test('buildBlockPrompt — optimize monta prompt standalone (sem o cabeçalho de
   assert.ok(prompt.length > 0);
   assert.ok(prompt.includes('texto original aqui'));
 });
+
+test('buildBlockPrompt — persona com voice injeta a voz no contexto', () => {
+  const prompt = buildBlockPrompt('page_name', { niche: 'teste', persona: 'fem_sensual' });
+  assert.ok(prompt.includes('misterios'));
+});
+
+test('buildBlockPrompt — persona sem voice usa personaLabel/fallback e não injeta voz', () => {
+  const prompt = buildBlockPrompt('page_name', { niche: 'teste', persona: 'sem_persona', personaLabel: 'Sem persona definida' });
+  assert.ok(!prompt.includes('misterios'));
+  assert.ok(prompt.includes('Sem persona definida'));
+});
