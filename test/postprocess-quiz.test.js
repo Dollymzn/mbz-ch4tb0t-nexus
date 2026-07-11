@@ -132,3 +132,23 @@ test('input null/undefined retorna intacto', () => {
   assert.equal(assembleQuizOverlays(null, {}), null);
   assert.equal(assembleQuizOverlays(undefined, {}), undefined);
 });
+
+test('stripChatbotVars — remove variáveis de chatbot ({{...}}) recursivamente antes de montar o overlay', () => {
+  const j = {
+    quizzes: [fullQuiz({
+      quiz_question: 'Oi {{FIRST_NAME}}, pronta?',
+      quiz_options: ['Sim {{UTM_CAMPAIGN}} claro', 'Não {{NOMEDAPAGINA}}'],
+      visual_options: [{ label: '{{FIRST_NAME}} adora rosas', pinterest: 'red roses' }],
+      final_cta_label: 'Ver {{URL_REDIR}} agora →'
+    })]
+  };
+  const result = assembleQuizOverlays(j, { niche: 'Tarot' });
+  const ov = result.quizzes[0].overlay;
+  assert.ok(!ov.qlist[0].title.includes('{{'), 'quiz_question nao deveria conter {{');
+  assert.ok(!/ {2,}/.test(ov.qlist[0].title), 'quiz_question nao deveria ter espaco duplo');
+  assert.equal(ov.qlist[0].title, 'Oi , pronta?');
+  ov.qlist[0].options.forEach(o => assert.ok(!o.includes('{{')));
+  assert.ok(!ov.questions.includes('{{'));
+  assert.ok(!ov.visual_questions[0].options[0].label.includes('{{'));
+  assert.ok(!ov.final_cta_label.includes('{{'));
+});

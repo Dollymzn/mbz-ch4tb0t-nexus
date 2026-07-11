@@ -17,7 +17,7 @@ const STEP_LABELS = ['Nicho', 'Idioma & Voz', 'Estrutura', 'Criativos', 'Gerar']
 const FIELD_IDS = ['niche', 'geoCountry', 'campaignLang', 'pageName', 'flowLang', 'contentLang', 'currency',
   'persona', 'modelWizard', 'onboardRoutes', 'onboardRouteType', 'seqRoutes', 'numP1', 'gridCols', 'gridRows',
   'numCreatives', 'creativePlatform', 'creativeSize'];
-const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios'];
+const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'utmNative'];
 
 let curStep = 1;
 const totalSteps = 5;
@@ -175,7 +175,8 @@ export function collectParams() {
     gridCols: +$('#gridCols').value, gridRows: +$('#gridRows').value,
     numCreatives: +$('#numCreatives').value, creativePlatform: $('#creativePlatform').value, creativeSize: $('#creativeSize').value,
     creativeType: (document.querySelector('input[name=creativeType]:checked') || {}).value || 'completo',
-    imagePrompts: $('#imagePrompts').checked
+    imagePrompts: $('#imagePrompts').checked,
+    utmNative: $('#utmNative').checked
   };
   return state.params;
 }

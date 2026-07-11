@@ -103,3 +103,36 @@ test('input null/undefined retorna intacto', () => {
   assert.equal(fixOnboardChatdrink(null, {}), null);
   assert.equal(fixOnboardChatdrink(undefined, {}), undefined);
 });
+
+test('params.utmNative=true: todos os botões url usam {{URL_REDIR}} sem query string', () => {
+  const j = buildOnboard(3);
+  fixOnboardChatdrink(j, { niche: 'Tarot Diário', utmNative: true });
+  for (let i = 1; i <= 3; i++) {
+    const route = j.routes[i];
+    const it = route.interactions.find(x => x.type === 'menu' || x.type === 'botoes');
+    const btns = it.type === 'menu' ? it.config.cards[0].buttons : it.config.buttons;
+    assert.equal(btns[0].url, '{{URL_REDIR}}');
+    assert.deepEqual(btns[0].urls, [{ url: '{{URL_REDIR}}', weight: 100 }]);
+  }
+});
+
+test('params.utmNative false/ausente: comportamento atual com utm_content onbN preservado', () => {
+  const j1 = buildOnboard(2);
+  fixOnboardChatdrink(j1, { niche: 'Tarot Diário', utmNative: false });
+  const slug = nslug('Tarot Diário');
+  for (let i = 1; i <= 2; i++) {
+    const route = j1.routes[i];
+    const it = route.interactions.find(x => x.type === 'menu' || x.type === 'botoes');
+    const btns = it.type === 'menu' ? it.config.cards[0].buttons : it.config.buttons;
+    assert.ok(btns[0].url.includes('utm_content=onb' + i + '-' + slug));
+  }
+
+  const j2 = buildOnboard(2);
+  fixOnboardChatdrink(j2, { niche: 'Tarot Diário' }); // utmNative ausente
+  for (let i = 1; i <= 2; i++) {
+    const route = j2.routes[i];
+    const it = route.interactions.find(x => x.type === 'menu' || x.type === 'botoes');
+    const btns = it.type === 'menu' ? it.config.cards[0].buttons : it.config.buttons;
+    assert.ok(btns[0].url.includes('utm_content=onb' + i + '-' + slug));
+  }
+});

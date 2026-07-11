@@ -88,3 +88,33 @@ test('input null/undefined retorna intacto', () => {
   assert.equal(fixSequenceChatdrink(null, {}), null);
   assert.equal(fixSequenceChatdrink(undefined, {}), undefined);
 });
+
+test('params.utmNative=true: botões de conteúdo E do fallback usam {{URL_REDIR}} sem query string', () => {
+  const j = buildSequence(3);
+  fixSequenceChatdrink(j, { niche: 'Chá Detox', utmNative: true });
+  for (let i = 1; i <= 3; i++) {
+    const menu = j.routes[i].interactions.find(x => x.type === 'menu');
+    const btn = menu.config.cards[0].buttons[0];
+    assert.equal(btn.url, '{{URL_REDIR}}');
+    assert.deepEqual(btn.urls, [{ url: '{{URL_REDIR}}', weight: 100 }]);
+  }
+  const fbRoute = j.routes[4];
+  const botoes = fbRoute.interactions.find(x => x.type === 'botoes');
+  const fbBtn = botoes.config.buttons[0];
+  assert.equal(fbBtn.url, '{{URL_REDIR}}');
+  assert.deepEqual(fbBtn.urls, [{ url: '{{URL_REDIR}}', weight: 100 }]);
+});
+
+test('params.utmNative false/ausente: comportamento atual com utm_content seqN/seqf preservado', () => {
+  const j = buildSequence(2);
+  fixSequenceChatdrink(j, { niche: 'Chá Detox', utmNative: false });
+  const slug = nslug('Chá Detox');
+  for (let i = 1; i <= 2; i++) {
+    const menu = j.routes[i].interactions.find(x => x.type === 'menu');
+    const btn = menu.config.cards[0].buttons[0];
+    assert.ok(btn.url.includes('utm_content=seq' + i + '-' + slug));
+  }
+  const fbRoute = j.routes[3];
+  const botoes = fbRoute.interactions.find(x => x.type === 'botoes');
+  assert.ok(botoes.config.buttons[0].url.includes('utm_content=seqf-' + slug));
+});

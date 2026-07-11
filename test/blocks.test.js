@@ -100,3 +100,34 @@ test('buildBlockPrompt — persona sem voice usa personaLabel/fallback e não in
   assert.ok(!prompt.includes('misterios'));
   assert.ok(prompt.includes('Sem persona definida'));
 });
+
+test('buildBlockPrompt — quiz proíbe variáveis de chatbot ({{...}})', () => {
+  const prompt = buildBlockPrompt('quiz', { niche: 'Carta de Amor', numP1: 3, contentLang: 'pt-BR' });
+  assert.ok(prompt.includes('PROIBIDO'));
+  assert.ok(prompt.includes('{{FIRST_NAME}}'));
+});
+
+test('buildBlockPrompt — creatives_prompt injeta o guia da plataforma google_flow/ImageFX', () => {
+  const prompt = buildBlockPrompt('creatives_prompt', { niche: 'Carta de Amor', creativePlatform: 'google_flow', creativeSize: '1080x1440', numCreatives: 5 });
+  assert.ok(prompt.includes('IMAGEFX') || prompt.includes('FRASES NATURAIS'));
+});
+
+test('buildBlockPrompt — creatives_prompt injeta o guia também no branch imgOnly e no svg_claude', () => {
+  const imgOnly = buildBlockPrompt('creatives_prompt', { niche: 'Carta de Amor', creativePlatform: 'midjourney', creativeType: 'imagem', creativeSize: '1080x1440', numCreatives: 5 });
+  assert.ok(imgOnly.includes('MIDJOURNEY'));
+
+  const svg = buildBlockPrompt('creatives_prompt', { niche: 'Carta de Amor', creativePlatform: 'svg_claude', creativeSize: '1080x1440', numCreatives: 10 });
+  assert.ok(svg.includes('hierarquia visual clara'));
+});
+
+test('buildBlockPrompt — onboard com utmNative:true troca a instrução de UTM', () => {
+  const prompt = buildBlockPrompt('onboard', { niche: 'Carta de Amor', utmNative: true, onboardRoutes: 3, flowLang: 'en-US' });
+  assert.ok(prompt.includes('SEM query string'));
+  assert.ok(prompt.includes('{{URL_REDIR}}'));
+});
+
+test('buildBlockPrompt — onboard sem utmNative mantém a instrução de utm_content onbN', () => {
+  const prompt = buildBlockPrompt('onboard', { niche: 'Carta de Amor', onboardRoutes: 3, flowLang: 'en-US' });
+  assert.ok(prompt.includes('utm_content'));
+  assert.ok(!prompt.includes('SEM query string'));
+});
