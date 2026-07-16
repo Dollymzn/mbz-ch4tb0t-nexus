@@ -5,7 +5,7 @@
 // ============================================================
 'use strict';
 
-import { state, esc, toast, setModel, setUserKey, setAccessPass, resetRun } from './state.js';
+import { state, esc, toast, setModel, setUserKey, setAccessPass, resetRun, mergeArtifacts } from './state.js';
 import { initFX, startClock } from './fx.js';
 import { getConfig, auth, getHistory, saveHistory, deleteHistory } from './api.js';
 import { makeRunView } from './render.js';
@@ -140,7 +140,27 @@ function runForge() {
     blocks.splice(gridIdx, 0, 'grid_preview');
   }
 
+  // persona_identity (v3.2a) também é predecessor automático (fora do block picker):
+  // a identidade visual fixa da persona é injetada em todo prompt de imagem/vídeo. Se a
+  // run tem algum bloco visual, não pediu persona_identity e não há identidade em cache,
+  // gera o character sheet PRIMEIRO (unshift) — mesmo padrão do grid_preview acima.
+  const VISUAL_BLOCKS = ['fb_images', 'image_prompts', 'creatives_prompt', 'video_prompts'];
+  if (blocks.some(function (b) { return VISUAL_BLOCKS.indexOf(b) >= 0; }) &&
+      blocks.indexOf('persona_identity') < 0 &&
+      !(state.artifacts && state.artifacts.personaIdentity)) {
+    blocks.unshift('persona_identity');
+  }
+
+  // Artifacts DURÁVEIS sobrevivem ao resetRun e viajam no body da run (dep soft #2
+  // do contrato). Sem isso, a identidade gerada no passo 1 (fotos FB) e a direção
+  // visual do grid eram apagadas aqui — e as guardas acima, que já pularam os blocos
+  // por "ter cache", deixavam a run rodar SEM identidade/direção nenhuma.
+  const carry = {};
+  if (state.artifacts && state.artifacts.personaIdentity) carry.personaIdentity = state.artifacts.personaIdentity;
+  if (state.artifacts && state.artifacts.gridDirection) carry.gridDirection = state.artifacts.gridDirection;
+
   resetRun();
+  mergeArtifacts(carry); // repõe os duráveis no cache do cliente (regen por card também os usa)
   const out = $('#output'); out.innerHTML = '';
   $('#wizForge').disabled = true; $('#classicForge').disabled = true;
   $('#outputActions').classList.add('hidden');
@@ -156,7 +176,7 @@ function runForge() {
   });
   blocks.forEach(function (b) { mainView.ensureCard(b); });
   out.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const payload = { blocks: blocks, params: state.params, model: state.model, artifacts: {} };
+  const payload = { blocks: blocks, params: state.params, model: state.model, artifacts: carry };
   if ($('#agentQuality') && $('#agentQuality').checked) {
     payload.agent = { enabled: true, maxIterations: 1, minScore: 7, blocks: null };
   }

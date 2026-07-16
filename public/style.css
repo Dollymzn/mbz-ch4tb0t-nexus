@@ -725,6 +725,15 @@
   .preset-chip{ display:inline-flex; align-items:center; gap:8px }
   .preset-chip .preset-del{ color:var(--pink); font-weight:var(--fw-bold); cursor:pointer; font-family:var(--f-mono) }
   .preset-chip .preset-del:hover{ color:#fff }
+
+  /* ---------- v3.2a: identidade visual da persona + vídeos Veo/Flow ---------- */
+  .clean-view .persona-name{ color:var(--cyan); font-size:var(--fs-lg); margin:0 0 10px }
+  .persona-core{ line-height:var(--lh-loose) }
+  .video-beats{ display:flex; flex-direction:column; gap:4px; margin:6px 0 8px; padding-left:10px; border-left:2px solid var(--purple) }
+  .video-beats p{ margin:0; font-size:var(--fs-sm); line-height:var(--lh-normal) }
+  .beat-label{ display:inline-block; min-width:64px; font-family:var(--f-mono); font-size:var(--fs-2xs); color:var(--pink); letter-spacing:var(--ls-tight) }
+  .video-dialogue{ color:var(--green); font-style:italic; margin:8px 0; text-shadow:0 0 8px rgba(var(--green-rgb)/.25) }
+  .video-prompt{ font-family:var(--f-mono); font-size:var(--fs-xs); color:var(--muted); white-space:pre-wrap; margin-top:8px }
 }
 
 /* ============================================================

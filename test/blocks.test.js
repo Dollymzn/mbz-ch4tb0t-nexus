@@ -8,11 +8,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { buildBlockPrompt, BLOCK_META, KNOWN_BLOCKS } = require('../lib/blocks');
 
+// v3.2a: 16 → 18 blocos reais (KNOWN_BLOCKS) — soma persona_identity + video_prompts.
 const EXPECTED_BLOCKS = [
   'page_name', 'fb_images', 'comment', 'onboard', 'sequence',
   'grid_preview', 'grid', 'p1_titles', 'p2_titles', 'quiz',
   'meta_copy', 'meta_onboard', 'image_prompts', 'creatives_prompt',
-  'audios', 'optimize'
+  'audios', 'optimize', 'persona_identity', 'video_prompts'
 ];
 
 test('BLOCK_META cobre todos os blocos usados pelo sistema', () => {
@@ -38,14 +39,15 @@ test('grafo de dependências — audios depende de creatives_prompt', () => {
 });
 
 test('grafo de dependências — blocos independentes não têm deps', () => {
-  const independentes = ['page_name', 'fb_images', 'comment', 'p1_titles', 'p2_titles', 'quiz', 'meta_copy', 'meta_onboard', 'optimize'];
+  // v3.2a: fb_images saiu da lista — agora depende (soft) de persona_identity.
+  const independentes = ['page_name', 'comment', 'p1_titles', 'p2_titles', 'quiz', 'meta_copy', 'meta_onboard', 'optimize', 'persona_identity'];
   independentes.forEach(b => {
     assert.deepEqual(BLOCK_META[b].deps, [], `"${b}" deveria ser independente (sem deps)`);
   });
 });
 
-test('maxTokens — 20000 para onboard, sequence, creatives_prompt, audios, quiz', () => {
-  ['onboard', 'sequence', 'creatives_prompt', 'audios', 'quiz'].forEach(b => {
+test('maxTokens — 20000 para onboard, sequence, creatives_prompt, audios, quiz, video_prompts', () => {
+  ['onboard', 'sequence', 'creatives_prompt', 'audios', 'quiz', 'video_prompts'].forEach(b => {
     assert.equal(BLOCK_META[b].maxTokens, 20000, `"${b}" deveria ter maxTokens 20000`);
   });
 });
@@ -54,9 +56,13 @@ test('maxTokens — 24000 para optimize', () => {
   assert.equal(BLOCK_META.optimize.maxTokens, 24000);
 });
 
+test('maxTokens — 2500 para persona_identity', () => {
+  assert.equal(BLOCK_META.persona_identity.maxTokens, 2500);
+});
+
 test('maxTokens — 7000 para o resto dos blocos', () => {
   const resto = EXPECTED_BLOCKS.filter(b =>
-    !['onboard', 'sequence', 'creatives_prompt', 'audios', 'quiz', 'optimize'].includes(b));
+    !['onboard', 'sequence', 'creatives_prompt', 'audios', 'quiz', 'optimize', 'video_prompts', 'persona_identity'].includes(b));
   resto.forEach(b => {
     assert.equal(BLOCK_META[b].maxTokens, 7000, `"${b}" deveria ter maxTokens 7000`);
   });

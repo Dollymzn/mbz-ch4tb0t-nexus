@@ -28,11 +28,13 @@ export const BLOCKS = [
   { id: 'meta_onboard',    name: 'Onboard Meta',      hint: 'texto',             kind: 'text',          def: true },
   { id: 'image_prompts',   name: 'Prompts de Imagem', hint: 'fluxo',             kind: 'text',          def: false, needsToggle: 'imagePrompts' },
   { id: 'creatives_prompt',name: 'Criativos',         hint: 'prompts',           kind: 'text',          def: false, needsToggle: 'wantCreatives' },
-  { id: 'audios',          name: 'Áudios v3',         hint: 'ElevenLabs',        kind: 'text',          def: false, needsToggle: 'wantAudios' }
+  { id: 'audios',          name: 'Áudios v3',         hint: 'ElevenLabs',        kind: 'text',          def: false, needsToggle: 'wantAudios' },
+  { id: 'video_prompts',   name: 'Vídeos (Veo)',      hint: 'clipes 8s',         kind: 'text',          def: false, needsToggle: 'wantVideos' }
 ];
 export const BLABEL = {};
 BLOCKS.forEach(function (b) { BLABEL[b.id] = b.name; });
 BLABEL.grid_preview = 'Grid · Prévia visual';
+BLABEL.persona_identity = 'Identidade Visual';
 BLABEL.optimize = 'Resultado Otimizado';
 BLABEL.review = 'Revisão do Agente';
 BLABEL.creative_analysis = 'Análise de Criativos';
@@ -42,13 +44,19 @@ const DEPENDENTS = {
   grid_preview: ['grid'],
   onboard: ['image_prompts'],
   sequence: ['image_prompts'],
-  creatives_prompt: ['audios']
+  // v3.2a: a identidade visual da persona é injetada em todo prompt de imagem/vídeo
+  persona_identity: ['fb_images', 'image_prompts', 'creatives_prompt', 'video_prompts'],
+  creatives_prompt: ['audios', 'video_prompts'],
+  audios: ['video_prompts']
 };
 // de quem cada card depende (mensagem de "desatualizado")
 const DEP_OF = {
   grid: 'grid_preview',
-  image_prompts: 'onboard/sequência',
-  audios: 'criativos'
+  fb_images: 'identidade visual',
+  image_prompts: 'onboard/sequência/identidade',
+  audios: 'criativos',
+  creatives_prompt: 'identidade visual',
+  video_prompts: 'criativos/áudios/identidade'
 };
 
 function kindOf(b) {
@@ -622,6 +630,40 @@ function sanitize(b, j, raw, ctx) {
     if (b === 'audios' && j.audios) {
       return j.audios.map(function (a) { return '<div class="kv"><span class="tag">#' + (a.index || '') + ' · voz: ' + esc(a.voice || '') + '</span><p>' + esc(a.script || '') + '</p></div>'; }).join('');
     }
+    // v3.2a — identidade visual fixa da persona (mesmo rosto em todo o funil)
+    if (b === 'persona_identity') {
+      const id = j.identity || j;
+      let h = '<span class="tag">IDENTIDADE VISUAL FIXA</span>';
+      if (id.character_name) h += '<h4 class="persona-name">' + esc(id.character_name) + '</h4>';
+      if (id.core) h += '<div class="kv"><p class="persona-core">' + esc(id.core) + '</p></div>';
+      if (Array.isArray(id.wardrobe) && id.wardrobe.length) h += '<div class="kv"><h4>Guarda-roupa</h4>' + ulist(id.wardrobe) + '</div>';
+      if (Array.isArray(id.palette) && id.palette.length) h += '<div class="kv"><h4>Paleta</h4><p>' + id.palette.map(function (c) { return '<span class="tag">' + esc(c) + '</span>'; }).join(' ') + '</p></div>';
+      if (id.photo_style) h += '<div class="kv"><h4>Estilo fotográfico</h4><p>' + esc(id.photo_style) + '</p></div>';
+      if (id.avoid) h += '<div class="kv"><h4>Nunca alterar</h4><p>' + esc(id.avoid) + '</p></div>';
+      return h;
+    }
+    // v3.2a — criativos de vídeo Veo 3 / Google Flow (clipes de ~8s, 9:16)
+    if (b === 'video_prompts' && j.videos) {
+      const head = '<span class="tag">' + esc(j.platform || 'veo_flow') + ' · ' + esc(j.format || '9:16') + ' · ' + j.videos.length + ' vídeos</span>';
+      return head + j.videos.map(function (v) {
+        const beats = v.beats || {};
+        const pid = ctx.ip.length; ctx.ip.push(v.prompt || '');
+        let h = '<div class="kv"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+          '<b>#' + esc(v.index || '') + ' · ' + esc(v.concept || '') + '</b>' +
+          '<button class="mini-btn ipcopy" data-ip="' + pid + '">copiar prompt</button></div>';
+        h += '<div class="video-beats">';
+        if (beats.hook_0_2s) h += '<p><span class="beat-label">0–2s hook</span> ' + esc(beats.hook_0_2s) + '</p>';
+        if (beats.body_2_6s) h += '<p><span class="beat-label">2–6s corpo</span> ' + esc(beats.body_2_6s) + '</p>';
+        if (beats.cta_6_8s) h += '<p><span class="beat-label">6–8s CTA</span> ' + esc(beats.cta_6_8s) + '</p>';
+        h += '</div>';
+        if (v.dialogue) h += '<p class="video-dialogue">“' + esc(v.dialogue) + '”</p>';
+        if (v.headline) h += '<p><b>Headline:</b> ' + esc(v.headline) + '</p>';
+        if (v.cta) h += '<p><b>CTA:</b> ' + esc(v.cta) + '</p>';
+        h += '<p class="video-prompt">' + esc(v.prompt || '') + '</p>';
+        h += '</div>';
+        return h;
+      }).join('');
+    }
   } catch (e) {}
   return '<pre>' + esc(JSON.stringify(j, null, 2)) + '</pre>';
 }
@@ -764,6 +806,9 @@ export function cleanText(b, j, raw) {
     if (b === 'creative_analysis') return JSON.stringify({ analysis: j.analysis || {}, variations: j.variations || [] }, null, 2);
     if (b === 'audios' && j.audios) return j.audios.map(function (a) { return '#' + a.index + ' [' + a.voice + ']\n' + a.script; }).join('\n\n');
     if (b === 'image_prompts') { const o = (j.onboard || []).map(function (x) { return x.step + ': ' + x.prompt; }).join('\n'); const s = (j.sequence || []).map(function (x) { return 'r' + x.route + ' ' + x.step + ': ' + x.prompt; }).join('\n'); return 'ONBOARD:\n' + o + '\n\nSEQUÊNCIA:\n' + s; }
+    // v3.2a: identidade pronta pra colar num gerador de imagem (core + guarda-roupa + estilo)
+    if (b === 'persona_identity') { const id = j.identity || j; const w = Array.isArray(id.wardrobe) ? id.wardrobe.join('\n') : (id.wardrobe || ''); return [id.core || '', w, id.photo_style || ''].filter(Boolean).join('\n\n'); }
+    if (b === 'video_prompts' && j.videos) return j.videos.map(function (v) { return '#' + v.index + ' ' + (v.concept || '') + '\n' + (v.prompt || '') + (v.cta ? '\nCTA: ' + v.cta : ''); }).join('\n\n');
   } catch (e) {}
   return JSON.stringify(j, null, 2);
 }

@@ -16,8 +16,8 @@ const $$ = function (s) { return [].slice.call(document.querySelectorAll(s)); };
 const STEP_LABELS = ['Nicho', 'Idioma & Voz', 'Estrutura', 'Criativos', 'Gerar'];
 const FIELD_IDS = ['niche', 'geoCountry', 'campaignLang', 'pageName', 'flowLang', 'contentLang', 'currency',
   'persona', 'modelWizard', 'onboardRoutes', 'onboardRouteType', 'seqRoutes', 'numP1', 'gridCols', 'gridRows',
-  'numCreatives', 'creativePlatform', 'creativeSize'];
-const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'utmNative', 'agentQuality'];
+  'numCreatives', 'creativePlatform', 'creativeSize', 'numVideos'];
+const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'wantVideos', 'utmNative', 'agentQuality'];
 
 let curStep = 1;
 const totalSteps = 5;
@@ -35,6 +35,7 @@ export function initWizard() {
   if (draft) { restoreWizard(draft); toast('Rascunho restaurado.'); }
   gridUpd();
   updateCreativeUI();
+  updateVideoUI();
   syncBlockToggles();
   updateSummary();
   gotoStep(1);
@@ -76,6 +77,7 @@ function wireWizard() {
   $$('input[name=creativeType]').forEach(function (r) { r.onchange = function () { updateCreativeUI(); syncBlockToggles(); }; });
   $('#imagePrompts').onchange = syncBlockToggles;
   $('#wantAudios').onchange = syncBlockToggles;
+  $('#wantVideos').onchange = function () { updateVideoUI(); syncBlockToggles(); };
   $('#agentQuality').onchange = function () { updateSummary(); scheduleDraft(); };
 
   // auto-save do rascunho: qualquer input/change no wizard
@@ -89,6 +91,12 @@ function updateCreativeUI() {
   const imgOnly = (document.querySelector('input[name=creativeType]:checked') || {}).value === 'imagem';
   $('#audioCard').style.display = imgOnly ? 'none' : '';
   if (imgOnly) $('#wantAudios').checked = false;
+}
+// vídeos Veo/Flow: mostra o stepper numVideos só com o toggle wantVideos ligado
+// (mesmo padrão de wantCreatives -> creativeOpts).
+function updateVideoUI() {
+  const opts = $('#videoOpts');
+  if (opts) opts.classList.toggle('hidden', !$('#wantVideos').checked);
 }
 
 function gridUpd() {
@@ -152,6 +160,7 @@ export function syncBlockToggles() {
   setBlk('image_prompts', $('#imagePrompts').checked);
   setBlk('creatives_prompt', $('#wantCreatives').checked);
   setBlk('audios', $('#wantAudios').checked);
+  setBlk('video_prompts', $('#wantVideos').checked);
   updateSummary();
   scheduleDraft();
 }
@@ -184,6 +193,7 @@ export function collectParams() {
     gridCols: +$('#gridCols').value, gridRows: +$('#gridRows').value,
     numCreatives: +$('#numCreatives').value, creativePlatform: $('#creativePlatform').value, creativeSize: $('#creativeSize').value,
     creativeType: (document.querySelector('input[name=creativeType]:checked') || {}).value || 'completo',
+    numVideos: +$('#numVideos').value,
     imagePrompts: $('#imagePrompts').checked,
     utmNative: $('#utmNative').checked
   };
@@ -210,7 +220,7 @@ export function restoreWizard(snap) {
   if (Array.isArray(snap.blocks)) {
     $$('.blk').forEach(function (d) { d.classList.toggle('on', snap.blocks.indexOf(d.dataset.block) >= 0); });
   }
-  gridUpd(); updateCreativeUI(); syncBlockToggles(); updateSummary();
+  gridUpd(); updateCreativeUI(); updateVideoUI(); syncBlockToggles(); updateSummary();
 }
 function scheduleDraft() { saveDraft(snapshotWizard()); }
 export function resetDraft() { clearDraft(); }
@@ -307,8 +317,11 @@ function genFbPhotos(e) {
   collectParams();
   const cont = $('#fbPhotosOut'); cont.innerHTML = '';
   const view = makeRunView(cont);
-  view.ensureCard('fb_images');
-  view.start({ blocks: ['fb_images'], params: state.params, model: state.model });
+  // gera o character sheet (persona_identity) ANTES da 1a foto se ainda não existir —
+  // garante o MESMO rosto em toda imagem/vídeo do funil. Depois fica em cache (state.artifacts).
+  const blocks = state.artifacts.personaIdentity ? ['fb_images'] : ['persona_identity', 'fb_images'];
+  blocks.forEach(function (b) { view.ensureCard(b); });
+  view.start({ blocks: blocks, params: state.params, model: state.model });
 }
 
 // executa 1 bloco e resolve com {json,raw,artifacts,warnings} do block_done
