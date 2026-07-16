@@ -145,3 +145,15 @@ test('buildBlockPrompt — onboard sem utmNative mantém a instrução de utm_co
   assert.ok(prompt.includes('utm_content'));
   assert.ok(!prompt.includes('SEM query string'));
 });
+
+test('buildBlockPrompt — fb_images: nicho manda sobre persona mística e post pede convite ao comentário (regressão página vidente)', () => {
+  // persona mística vazada do rascunho num nicho de crédito:
+  const prompt = buildBlockPrompt('fb_images', { niche: 'cartão de crédito para negativados', persona: 'fem_mistica', personaLabel: 'Feminina mística (vidente / cartomante)', campaignLang: 'pt-BR', pageName: 'Renata Bittencourt', geoCountry: 'Brasil' });
+  assert.ok(prompt.includes('REGRA-MÃE'));
+  assert.ok(/IGNORE esse universo|NUNCA use termos de tarô/i.test(prompt));
+  // bio e post travados no nicho, não no universo da persona
+  assert.ok(prompt.includes('SEM termos de outro nicho'));
+  // post mais longo terminando em convite ao comentário
+  assert.ok(/convite EXPLICITO pra COMENTAR/i.test(prompt));
+  assert.ok(prompt.includes('10 a 16 linhas'));
+});

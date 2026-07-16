@@ -21,6 +21,7 @@ const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'utmNative', '
 
 let curStep = 1;
 const totalSteps = 5;
+let defaultSnapshot = null; // estado pristino (defaults), capturado ANTES de restaurar rascunho
 
 /* ============================================================ */
 export function initWizard() {
@@ -28,6 +29,8 @@ export function initWizard() {
   buildBlockPick();
   buildPresetBar();
   wireWizard();
+  // captura os defaults ANTES de restaurar o rascunho — é o que o "Novo funil" restaura
+  defaultSnapshot = snapshotWizard();
   const draft = loadDraft();
   if (draft) { restoreWizard(draft); toast('Rascunho restaurado.'); }
   gridUpd();
@@ -212,6 +215,18 @@ export function restoreWizard(snap) {
 function scheduleDraft() { saveDraft(snapshotWizard()); }
 export function resetDraft() { clearDraft(); }
 
+// "Novo funil": apaga o rascunho e volta TUDO aos defaults (persona sem_persona, nicho
+// vazio, etc.), sem arrastar estado de um funil anterior. Presets salvos são preservados.
+export function newFunnel() {
+  clearDraft();
+  if (defaultSnapshot) restoreWizard(defaultSnapshot);
+  const chips = $('#nameChips'); if (chips) chips.innerHTML = '';
+  const fbOut = $('#fbPhotosOut'); if (fbOut) fbOut.innerHTML = '';
+  scheduleDraft(); // salva o estado limpo como novo rascunho
+  gotoStep(1);
+  toast('Novo funil — campos limpos.');
+}
+
 /* ---------- presets UI ---------- */
 function buildPresetBar() {
   const bar = $('#presetBar'); if (!bar) return;
@@ -219,6 +234,7 @@ function buildPresetBar() {
     '<div class="preset-row">' +
       '<input type="text" id="presetName" placeholder="nome do preset" class="preset-input">' +
       '<button id="presetSave" class="btn-ghost-sm" type="button">💾 salvar preset</button>' +
+      '<button id="newFunnel" class="btn-ghost-sm" type="button" title="Limpa o rascunho e volta tudo aos padrões">🧹 novo funil</button>' +
     '</div>' +
     '<div class="preset-chips" id="presetChips"></div>';
   $('#presetSave').onclick = function () {
@@ -228,6 +244,9 @@ function buildPresetBar() {
     $('#presetName').value = '';
     renderPresetChips();
     toast('Preset salvo: ' + name);
+  };
+  $('#newFunnel').onclick = function () {
+    if (confirm('Começar um funil novo? Isso limpa o nicho, persona e todos os campos (os presets salvos são mantidos).')) newFunnel();
   };
   renderPresetChips();
 }
