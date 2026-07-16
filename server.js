@@ -28,7 +28,7 @@ const MODELS = [
   { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 (econômico)' }
 ];
 
-app.use(express.json({ limit: '6mb' }));
+app.use(express.json({ limit: '10mb' })); // v3.1: imagens base64 no body (§2)
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---- auth helpers (mantidos da fase 2: rate-limit + timingSafeEqual) ----
@@ -93,7 +93,8 @@ app.post('/api/run', async (req, res) => {
   const v = validateParams(body);
   if (!v.ok) return res.status(400).json({ error: v.errors.join(' ') || 'Parâmetros inválidos.' });
 
-  const { blocks, params = {}, model, artifacts } = body;
+  // v3.1: agent (política do auto-loop) e images (espelho de tamanho) são repassados.
+  const { blocks, params = {}, model, artifacts, agent, images } = body;
 
   // A partir daqui é stream — sem gzip nesta rota (nenhum middleware de compressão está montado).
   const sse = openSSE(res);
@@ -105,7 +106,7 @@ app.post('/api/run', async (req, res) => {
   const system = buildSystemPrompt();
   try {
     await runOrchestration({
-      blocks, params, model, artifacts,
+      blocks, params, model, artifacts, agent, images, models: MODELS,
       apiKey, system, sse, signal: ac.signal
     });
   } catch (e) {

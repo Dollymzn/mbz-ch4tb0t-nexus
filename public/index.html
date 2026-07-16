@@ -235,6 +235,10 @@
           <p class="step-help">Marque só o que precisa. Se já tem onboard e sequência prontos, desmarque e gere apenas o resto.</p>
           <div class="preset-bar" id="presetBar"></div>
           <div class="block-pick" id="blockPick"></div>
+          <div class="toggle-card agent-toggle-card">
+            <label class="switch"><input type="checkbox" id="agentQuality"><span class="slider"></span></label>
+            <div class="toggle-info"><b>🛡 Agente de qualidade</b><span id="agentCostHint">+ até 0 revisões nesta run</span></div>
+          </div>
           <div class="summary" id="summary"></div>
         </div>
       </div>
@@ -299,6 +303,31 @@
     </div>
     <button id="optBtn" class="btn-forge">OTIMIZAR 🔧</button>
     <div id="optOutput" class="output"></div>
+
+    <div class="creative-analysis-section">
+      <div class="opt-hero">
+        <h3 class="section-title">Criativos</h3>
+        <p class="step-help">Envie até 6 imagens vencedoras para extrair DNA e gerar variações estruturadas.</p>
+      </div>
+      <div class="card-grid">
+        <div class="sel-card">
+          <label>Imagens</label>
+          <input type="file" id="optCreativeFiles" accept="image/*" multiple>
+          <small>Downscale local: lado maior até 1568px, JPEG q0.85</small>
+        </div>
+        <div class="sel-card">
+          <label>Plataforma-alvo</label>
+          <select id="optCreativePlatform"></select>
+        </div>
+        <div class="sel-card">
+          <label>Variações</label>
+          <input type="number" id="optCreativeVariations" value="8" min="1" max="20">
+        </div>
+      </div>
+      <div id="optCreativeList" class="creative-upload-list"></div>
+      <button id="optCreativeBtn" class="btn-forge">ANALISAR CRIATIVOS 🔎</button>
+      <div id="optCreativeOutput" class="output"></div>
+    </div>
   </section>
 
   <!-- ============ HISTÓRICO ============ -->

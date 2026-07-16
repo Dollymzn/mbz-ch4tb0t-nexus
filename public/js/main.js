@@ -32,6 +32,7 @@ function loadConfig() {
     fillSel('#currency', cfg.currencies, 'id', 'label', 'USD');
     fillSel('#persona', cfg.personas, 'id', 'label', 'sem_persona');
     fillSel('#creativePlatform', cfg.creativePlatforms, 'id', 'label', 'svg_claude');
+    fillSel('#optCreativePlatform', cfg.creativePlatforms, 'id', 'label', 'google_flow');
     fillSel('#creativeSize', cfg.creativeSizes, 'id', 'label', '1080x1440');
     // modelo: catálogo vem do backend (contrato §1) — nunca hardcodado
     if (!state.model && Array.isArray(cfg.models) && cfg.models.length) setModel(cfg.models[0].id);
@@ -155,7 +156,11 @@ function runForge() {
   });
   blocks.forEach(function (b) { mainView.ensureCard(b); });
   out.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  mainView.start({ blocks: blocks, params: state.params, model: state.model, artifacts: {} });
+  const payload = { blocks: blocks, params: state.params, model: state.model, artifacts: {} };
+  if ($('#agentQuality') && $('#agentQuality').checked) {
+    payload.agent = { enabled: true, maxIterations: 1, minScore: 7, blocks: null };
+  }
+  mainView.start(payload);
 }
 
 /* ---------- otimizador ---------- */
@@ -174,6 +179,8 @@ function wireOptimizer() {
   }
   $('#optKind').onchange = updImgToggle; updImgToggle();
   $('#optBtn').onclick = runOptimize;
+  $('#optCreativeFiles').onchange = handleCreativeFiles;
+  $('#optCreativeBtn').onclick = runCreativeAnalysis;
 }
 function runOptimize() {
   const content = $('#optContent').value.trim();
@@ -266,6 +273,122 @@ function inferNicheFromFlow(flow) {
 }
 
 /* ---------- histórico ---------- */
+let creativeImages = [];
+
+function handleCreativeFiles() {
+  const files = [].slice.call($('#optCreativeFiles').files || []).slice(0, 6);
+  creativeImages = [];
+  renderCreativeUploads();
+  if (!files.length) return;
+  const btn = $('#optCreativeBtn');
+  btn.disabled = true;
+  setBusy(true);
+  Promise.all(files.map(downscaleImage)).then(function (imgs) {
+    creativeImages = imgs;
+    renderCreativeUploads();
+    toast(imgs.length + ' imagem(ns) prontas.');
+  }).catch(function (e) {
+    toast((e && e.message) || 'Falha ao processar imagem.');
+  }).finally(function () {
+    btn.disabled = false;
+    setBusy(false);
+  });
+}
+
+function downscaleImage(file) {
+  return new Promise(function (resolve, reject) {
+    if (!file || !file.type || file.type.indexOf('image/') !== 0) { reject(new Error('Arquivo não é imagem.')); return; }
+    const rd = new FileReader();
+    rd.onerror = function () { reject(new Error('Falha ao ler imagem.')); };
+    rd.onload = function () {
+      const img = new Image();
+      img.onerror = function () { reject(new Error('Imagem inválida.')); };
+      img.onload = function () {
+        try {
+          const maxSide = 1568;
+          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('Canvas indisponível.')); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          const url = canvas.toDataURL('image/jpeg', 0.85);
+          const data = (url.split(',')[1]) || '';
+          if (!data) { reject(new Error('Falha ao processar imagem.')); return; }
+          resolve({ name: file.name, width: w, height: h, media_type: 'image/jpeg', data: data, metrics: {} });
+        } catch (err) {
+          // drawImage/toDataURL podem lançar (imagem gigante, canvas "tainted", memória):
+          // rejeitar aqui evita o Promise.all pendurado (botão travaria desabilitado).
+          reject(new Error('Falha ao processar imagem: ' + (err && err.message ? err.message : 'erro')));
+        }
+      };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  });
+}
+
+function renderCreativeUploads() {
+  const wrap = $('#optCreativeList'); if (!wrap) return;
+  if (!creativeImages.length) { wrap.innerHTML = '<span class="preset-empty">nenhuma imagem carregada</span>'; return; }
+  wrap.innerHTML = creativeImages.map(function (im, i) {
+    return '<div class="creative-upload-row">' +
+      '<div><b>' + esc(im.name || ('imagem ' + (i + 1))) + '</b><small>' + im.width + '×' + im.height + '</small></div>' +
+      '<input type="number" step="0.01" min="0" data-metric="ctr" data-i="' + i + '" placeholder="CTR">' +
+      '<input type="number" step="0.01" min="0" data-metric="cpm" data-i="' + i + '" placeholder="CPM">' +
+      '<input type="number" step="0.01" min="0" data-metric="spend" data-i="' + i + '" placeholder="Spend">' +
+      '<input type="text" data-metric="note" data-i="' + i + '" placeholder="nota opcional">' +
+    '</div>';
+  }).join('');
+  wrap.querySelectorAll('[data-metric]').forEach(function (el) {
+    el.oninput = function () {
+      const im = creativeImages[+el.getAttribute('data-i')];
+      if (!im) return;
+      const k = el.getAttribute('data-metric');
+      const v = el.value.trim();
+      if (!v) { delete im.metrics[k]; return; }
+      im.metrics[k] = k === 'note' ? v : Number(v);
+    };
+  });
+}
+
+function runCreativeAnalysis() {
+  if (!creativeImages.length) { toast('Carregue ao menos uma imagem.'); return; }
+  if (!state.cfg.serverKey && !state.userKey) { $('#keyModal').classList.remove('hidden'); return; }
+  try { collectParams(); } catch (e) {}
+  const images = creativeImages.map(function (im) {
+    const metrics = {};
+    Object.keys(im.metrics || {}).forEach(function (k) {
+      const v = im.metrics[k];
+      if (v !== '' && v != null && !(typeof v === 'number' && !isFinite(v))) metrics[k] = v;
+    });
+    return { media_type: im.media_type, data: im.data, metrics: metrics };
+  });
+  const params = {
+    creative_analysis: {
+      images: images,
+      platform: $('#optCreativePlatform').value,
+      nVariations: +$('#optCreativeVariations').value || 8,
+      niche: state.params.niche || $('#niche').value.trim(),
+      persona: state.params.personaLabel || '',
+      size: $('#creativeSize').value || '1080x1440',
+      flowLang: state.params.flowLang || $('#flowLang').value || 'en-US'
+    }
+  };
+  const out = $('#optCreativeOutput'); out.innerHTML = '';
+  $('#optCreativeBtn').disabled = true; setBusy(true);
+  const view = makeRunView(out, {
+    onFinish: function () {
+      $('#optCreativeBtn').disabled = false;
+      setBusy(false);
+    }
+  });
+  view.ensureCard('creative_analysis');
+  view.start({ blocks: ['creative_analysis'], params: params, model: $('#optModel').value || state.model, images: images });
+}
+
 function loadHistory() {
   getHistory().then(function (list) {
     const el = $('#historyList');
@@ -289,7 +412,7 @@ function loadEntry(h) {
   const blocks = h.blocks || {};
   Object.keys(blocks).forEach(function (b) {
     const data = blocks[b];
-    view.renderStatic(b, { json: data.json, raw: data.raw, artifacts: data.artifacts, warnings: data.warnings });
+    view.renderStatic(b, { json: data.json, raw: data.raw, artifacts: data.artifacts, warnings: data.warnings, review: data.review, attempt: data.attempt });
   });
   $('#outputActions').classList.remove('hidden');
   toast('Funil carregado.');
@@ -301,7 +424,10 @@ function wireOutputActions() {
   $('#classicForge').onclick = function () { runForge(); };
   $('#saveBtn').onclick = function () {
     const save = {};
-    Object.keys(state.results).forEach(function (k) { const r = state.results[k]; save[k] = { json: r.json, raw: r.raw, artifacts: r.artifacts, warnings: r.warnings }; });
+    Object.keys(state.results).forEach(function (k) {
+      const r = state.results[k];
+      save[k] = { json: r.json, raw: r.raw, artifacts: r.artifacts, warnings: r.warnings, review: r.review, attempt: r.attempt };
+    });
     if (!Object.keys(save).length) { toast('Nada para salvar.'); return; }
     saveHistory({ niche: state.params.niche, params: state.params, blocks: save }).then(function () { toast('Salvo no histórico ✓'); });
   };

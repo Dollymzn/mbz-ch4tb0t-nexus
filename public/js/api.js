@@ -53,18 +53,23 @@ const EVENT_MAP = {
   block_delta: 'onBlockDelta',
   block_done:  'onBlockDone',
   block_error: 'onBlockError',
+  agent_reviewing: 'onAgentReviewing',
+  agent_review:    'onAgentReview',
   run_done:    'onRunDone',
   run_error:   'onRunError'
 };
 
 export function runStream(payload, handlers) {
   const controller = new AbortController();
-  const body = JSON.stringify({
+  const reqBody = {
     blocks: payload.blocks,
     params: payload.params || {},
     model: payload.model || state.model,
     artifacts: (payload.artifacts && Object.keys(payload.artifacts).length) ? payload.artifacts : undefined
-  });
+  };
+  if (payload.agent) reqBody.agent = payload.agent;
+  if (payload.images) reqBody.images = payload.images;
+  const body = JSON.stringify(reqBody);
 
   fetch('/api/run', {
     method: 'POST',

@@ -34,6 +34,8 @@ export const BLABEL = {};
 BLOCKS.forEach(function (b) { BLABEL[b.id] = b.name; });
 BLABEL.grid_preview = 'Grid · Prévia visual';
 BLABEL.optimize = 'Resultado Otimizado';
+BLABEL.review = 'Revisão do Agente';
+BLABEL.creative_analysis = 'Análise de Criativos';
 
 // dependentes: quando a CHAVE é regenerada, os VALORES ficam "desatualizados"
 const DEPENDENTS = {
@@ -101,17 +103,20 @@ export function makeRunView(container, opts) {
     el.className = 'block-card';
     el.innerHTML =
       '<div class="block-head">' +
-        '<span class="block-title">◢ ' + esc(label) + '</span>' +
+        '<span class="block-title">◢ ' + esc(label) + '<span class="attempt-badge hidden"></span></span>' +
         '<div class="block-actions">' +
           '<span class="block-status pending">aguardando</span>' +
           (hasChat(block) ? '<button class="mini-btn chat-toggle hidden" type="button">💬 chat</button>' : '') +
           (kind === 'json-download' ? '<button class="mini-btn dl hidden" type="button">⬇ baixar .json</button>' : '') +
           '<button class="mini-btn cp hidden" type="button">copiar</button>' +
+          (block !== 'review' ? '<button class="mini-btn review hidden" type="button">🔎 Analisar</button>' : '') +
           '<button class="mini-btn regen hidden" type="button">🔁 regenerar</button>' +
         '</div>' +
       '</div>' +
       '<div class="card-strip warn hidden"></div>' +
+      '<div class="card-strip review hidden"></div>' +
       '<div class="card-strip stale hidden"></div>' +
+      '<div class="agent-review-panel hidden"></div>' +
       '<div class="block-body collapsed"></div>';
 
     const card = {
@@ -119,12 +124,16 @@ export function makeRunView(container, opts) {
       headEl: el.querySelector('.block-head'),
       statusEl: el.querySelector('.block-status'),
       bodyEl: el.querySelector('.block-body'),
+      attemptEl: el.querySelector('.attempt-badge'),
       warnEl: el.querySelector('.card-strip.warn'),
+      reviewStripEl: el.querySelector('.card-strip.review'),
+      reviewPanelEl: el.querySelector('.agent-review-panel'),
       staleEl: el.querySelector('.card-strip.stale'),
       regenBtn: el.querySelector('.regen'),
       cpBtn: el.querySelector('.cp'),
       dlBtn: el.querySelector('.dl'),
       chatBtn: el.querySelector('.chat-toggle'),
+      reviewBtn: el.querySelector('.mini-btn.review'),
       preEl: null, json: null, raw: '', status: 'pending', mode: 'json'
     };
 
@@ -134,6 +143,7 @@ export function makeRunView(container, opts) {
     });
     card.regenBtn.addEventListener('click', function (e) { e.stopPropagation(); regen(block); });
     card.cpBtn.addEventListener('click', function (e) { e.stopPropagation(); doCopy(card); });
+    if (card.reviewBtn) card.reviewBtn.addEventListener('click', function (e) { e.stopPropagation(); analyzeCard(card); });
     if (card.dlBtn) card.dlBtn.addEventListener('click', function (e) { e.stopPropagation(); doDownload(card); });
     if (card.chatBtn) card.chatBtn.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -150,11 +160,24 @@ export function makeRunView(container, opts) {
     card.statusEl.className = 'block-status ' + st;
     card.statusEl.innerHTML =
       st === 'loading' ? '<span class="spinner"></span> gerando' :
+      st === 'reviewing' ? '🔍 revisando' :
       st === 'done' ? '✓ pronto' :
       st === 'error' ? '✕ erro' :
       st === 'interrupted' ? '⛔ interrompido' :
       st === 'stale' ? '♻ desatualizado' : 'aguardando';
-    if (st === 'loading' || st === 'done') card.bodyEl.classList.remove('collapsed');
+    if (st === 'loading' || st === 'done' || st === 'reviewing') card.bodyEl.classList.remove('collapsed');
+  }
+  function setAttempt(card, attempt) {
+    const n = Number(attempt || 1);
+    card.attempt = n;
+    if (!card.attemptEl) return;
+    if (n > 1) {
+      card.attemptEl.textContent = 'v' + n;
+      card.attemptEl.classList.remove('hidden');
+    } else {
+      card.attemptEl.textContent = '';
+      card.attemptEl.classList.add('hidden');
+    }
   }
   function freshPreview(card) {
     card.warnEl.classList.add('hidden'); card.warnEl.textContent = '';
@@ -172,6 +195,7 @@ export function makeRunView(container, opts) {
   function revealActions(card) {
     card.cpBtn.classList.remove('hidden');
     card.regenBtn.classList.remove('hidden');
+    if (card.reviewBtn) card.reviewBtn.classList.remove('hidden');
     if (card.dlBtn) card.dlBtn.classList.remove('hidden');
     if (card.chatBtn && card.json && Array.isArray((card.json || {}).routes)) card.chatBtn.classList.remove('hidden');
   }
@@ -208,18 +232,63 @@ export function makeRunView(container, opts) {
     card.bodyEl.innerHTML = '<pre>' + (dep ? '⚠ ' : 'ERRO: ') + esc(msg) + (d && d.code ? '  [' + esc(d.code) + ']' : '') + '</pre>';
     card.regenBtn.classList.remove('hidden');
   }
+  function reviewClass(review) {
+    const action = String((review && review.action) || '').toLowerCase();
+    const verdict = String((review && review.veredito) || '').toLowerCase();
+    if (action === 'accept' || verdict.indexOf('aprovar') >= 0) return 'accept';
+    if (action === 'skipped') return 'skipped';
+    return 'regenerate';
+  }
+  function renderReviewHtml(review, panel) {
+    review = review || {};
+    const score = review.score != null ? review.score : '?';
+    let h = panel ? '<div class="clean-view review-panel-view">' : '';
+    h += '<div class="review-score"><span class="tag">score ' + esc(score) + '/10</span>' +
+      (review.veredito ? '<b>' + esc(review.veredito) + '</b>' : '') + '</div>';
+    if (review.problemas && review.problemas.length) h += '<h4>Problemas</h4>' + ulist(review.problemas);
+    if (review.sugestoes && review.sugestoes.length) h += '<h4>Sugestões</h4>' + ulist(review.sugestoes);
+    if (review.direcao_de_correcao) h += '<h4>Direção</h4><p>' + esc(review.direcao_de_correcao) + '</p>';
+    if (panel) h += '<button class="mini-btn apply-review" type="button">Aplicar sugestões</button></div>';
+    return h;
+  }
+  function showReview(card, review, asPanel) {
+    if (!card || !review) return;
+    card.review = review;
+    card.reviewStripEl.className = 'card-strip review ' + reviewClass(review);
+    card.reviewStripEl.innerHTML = '🛡 score ' + esc(review.score != null ? review.score : '?') + '/10' +
+      (review.veredito ? ' · ' + esc(review.veredito) : '') +
+      (review.action ? ' · ' + esc(review.action) : '');
+    card.reviewStripEl.classList.remove('hidden');
+    if (!asPanel) return;
+    card.reviewPanelEl.innerHTML = renderReviewHtml(review, true);
+    card.reviewPanelEl.classList.remove('hidden');
+    const btn = card.reviewPanelEl.querySelector('.apply-review');
+    if (btn) btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      regen(card.block, {
+        blocks: [card.block],
+        params: Object.assign({}, state.params, { _agentFeedback: review }),
+        artifacts: state.artifacts
+      });
+    });
+  }
 
   /* ---------- block_done ---------- */
   function storeResult(d) {
-    setResult(d.block, { json: d.json, raw: d.raw, artifacts: d.artifacts, warnings: d.warnings, status: 'done' });
+    const data = { json: d.json, raw: d.raw, artifacts: d.artifacts, warnings: d.warnings, status: 'done' };
+    if (d.review !== undefined) data.review = d.review;
+    if (d.attempt !== undefined) data.attempt = d.attempt;
+    setResult(d.block, data);
     if (d.artifacts) mergeArtifacts(d.artifacts);
   }
   function renderDone(card, d) {
     card.json = d.json != null ? d.json : safeParse(d.raw);
     card.raw = d.raw || '';
     card.preEl = null;
+    if (d.attempt !== undefined) setAttempt(card, d.attempt);
     setStatus(card, 'done');
     showWarnings(card, d.warnings);
+    if (d.review || (state.results[d.block] && state.results[d.block].review)) showReview(card, d.review || state.results[d.block].review, false);
     revealActions(card);
     renderCardBody(card);
   }
@@ -229,6 +298,7 @@ export function makeRunView(container, opts) {
   function onBlockStart(d) {
     const card = ensureCard(d.block);
     inFlight[d.block] = true;
+    setAttempt(card, d.attempt);
     setStatus(card, 'loading');
     freshPreview(card);
   }
@@ -243,6 +313,16 @@ export function makeRunView(container, opts) {
     });
   }
   function onBlockError(d) { delete inFlight[d.block]; renderError(ensureCard(d.block), d); }
+  function onAgentReviewing(d) {
+    const card = ensureCard(d.block);
+    setAttempt(card, d.attempt);
+    setStatus(card, 'reviewing');
+  }
+  function onAgentReview(d) {
+    const card = ensureCard(d.block);
+    setResult(d.block, { review: d, attempt: d.attempt });
+    showReview(card, d, false);
+  }
   function onRunDone(d) {
     runDoneSeen = true;
     (d.skipped || []).forEach(function (b) {
@@ -273,6 +353,7 @@ export function makeRunView(container, opts) {
   const handlers = {
     onRunStart: onRunStart, onBlockStart: onBlockStart, onBlockDelta: onBlockDelta,
     onBlockDone: onBlockDone, onBlockError: onBlockError, onRunDone: onRunDone,
+    onAgentReviewing: onAgentReviewing, onAgentReview: onAgentReview,
     onRunError: onRunError, onAbort: onAbort, onStreamEnd: onStreamEnd
   };
 
@@ -292,7 +373,7 @@ export function makeRunView(container, opts) {
     let localDone = false;
     const h = {
       onRunStart: function () {},
-      onBlockStart: function (d) { const c = ensureCard(d.block); setStatus(c, 'loading'); freshPreview(c); },
+      onBlockStart: function (d) { const c = ensureCard(d.block); setAttempt(c, d.attempt); setStatus(c, 'loading'); freshPreview(c); },
       onBlockDelta: function (d) { appendDelta(ensureCard(d.block), d.text); },
       onBlockDone: function (d) {
         storeResult(d);
@@ -303,6 +384,8 @@ export function makeRunView(container, opts) {
         });
       },
       onBlockError: function (d) { renderError(ensureCard(d.block), d); },
+      onAgentReviewing: function (d) { const c = ensureCard(d.block); setAttempt(c, d.attempt); setStatus(c, 'reviewing'); },
+      onAgentReview: function (d) { const c = ensureCard(d.block); setResult(d.block, { review: d, attempt: d.attempt }); showReview(c, d, false); },
       onRunDone: function (d) { localDone = true; (d.skipped || []).forEach(function (b) { if (cards[b]) renderError(cards[b], { reason: 'dependency_failed' }); }); },
       onRunError: function (d) { if (!localDone && card.status === 'loading') markInterrupted(card); if (d && d.message) toast('Falha: ' + d.message); },
       onAbort: function () { if (card.status === 'loading') markInterrupted(card); },
@@ -316,6 +399,29 @@ export function makeRunView(container, opts) {
   }
 
   // render estático (histórico): sem marcar dependentes como desatualizados
+  function analyzeCard(card) {
+    if (!card || !card.json) { toast('Sem JSON para analisar.'); return; }
+    card.reviewPanelEl.classList.remove('hidden');
+    card.reviewPanelEl.innerHTML = '<div class="clean-view"><span class="tag">ANÁLISE</span><p><span class="spinner"></span> revisando bloco...</p></div>';
+    runStream({
+      blocks: ['review'],
+      model: state.model,
+      params: { review: { target: card.block, json: card.json, params: state.params } }
+    }, {
+      onBlockDone: function (d) {
+        if (d.block !== 'review') return;
+        setResult(card.block, { review: d.json });
+        showReview(card, d.json, true);
+      },
+      onBlockError: function (d) {
+        card.reviewPanelEl.innerHTML = '<div class="clean-view"><p style="color:var(--pink)">Falha na análise: ' + esc((d && d.message) || 'erro') + '</p></div>';
+      },
+      onRunError: function (d) {
+        card.reviewPanelEl.innerHTML = '<div class="clean-view"><p style="color:var(--pink)">Falha na análise: ' + esc((d && d.message) || 'erro') + '</p></div>';
+      }
+    });
+  }
+
   function renderStatic(block, d) {
     const card = ensureCard(block);
     storeResult(Object.assign({ block: block }, d));
@@ -339,7 +445,7 @@ function renderCardBody(card) {
   if (kindOf(b) === 'json-download') {
     card.bodyEl.innerHTML = '<pre>' + esc(json ? JSON.stringify(json, null, 2) : raw) + '</pre>';
   } else {
-    const ctx = { ip: [], quiz: [] };
+    const ctx = { ip: [], quiz: [], cv: [] };
     card.bodyEl.innerHTML = '<div class="clean-view">' + sanitize(b, json, raw, ctx) + '</div>';
     bindBody(card, ctx);
   }
@@ -466,6 +572,36 @@ function sanitize(b, j, raw, ctx) {
       }
       return h;
     }
+    if (b === 'creative_analysis') {
+      const analysis = j.analysis || {};
+      const vars = j.variations || [];
+      let h = '<span class="tag">DNA DO CRIATIVO</span>';
+      if (analysis.dna) h += '<div class="kv"><h4>DNA</h4><p>' + esc(analysis.dna) + '</p></div>';
+      if (analysis.porque_venceu) h += '<div class="kv"><h4>Por que venceu</h4><p>' + esc(analysis.porque_venceu) + '</p></div>';
+      if (analysis.elementos_chave && analysis.elementos_chave.length) h += '<div class="kv"><h4>Elementos-chave</h4>' + ulist(analysis.elementos_chave) + '</div>';
+      if (analysis.alertas_meta_policy && analysis.alertas_meta_policy.length) h += '<div class="kv"><h4>Alertas Meta Policy</h4>' + ulist(analysis.alertas_meta_policy) + '</div>';
+      if (vars.length) {
+        h += '<h4>Variações</h4><div class="creative-var-grid">';
+        vars.forEach(function (v) {
+          const copy = [
+            v.index ? '#' + v.index : '',
+            v.dimensao_variada || '',
+            v.headline ? 'Headline: ' + v.headline : '',
+            v.cta ? 'CTA: ' + v.cta : '',
+            v.prompt || ''
+          ].filter(Boolean).join('\n');
+          const id = ctx.cv.length; ctx.cv.push(copy);
+          h += '<div class="creative-var-card kv">' +
+            '<div class="creative-var-head"><span class="tag">#' + esc(v.index || '') + ' · ' + esc(v.dimensao_variada || '') + '</span><button class="mini-btn creative-var-copy" data-cv="' + id + '">copiar</button></div>' +
+            (v.headline ? '<p><b>Headline:</b> ' + esc(v.headline) + '</p>' : '') +
+            (v.cta ? '<p><b>CTA:</b> ' + esc(v.cta) + '</p>' : '') +
+            '<p>' + esc(v.prompt || '') + '</p>' +
+          '</div>';
+        });
+        h += '</div>';
+      }
+      return h || '<pre>' + esc(JSON.stringify(j, null, 2)) + '</pre>';
+    }
     if (b === 'creatives_prompt') {
       if (j.prompt) return '<pre>' + esc(j.prompt) + '</pre>';
       if (j.prompts) {
@@ -546,6 +682,12 @@ function bindBody(card, ctx) {
       copyToBtn(btn, ctx.ip[+btn.getAttribute('data-ip')] || '', 'copiar');
     });
   });
+  body.querySelectorAll('.creative-var-copy').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      copyToBtn(btn, ctx.cv[+btn.getAttribute('data-cv')] || '', 'copiar');
+    });
+  });
   body.querySelectorAll('.qdl').forEach(function (btn) {
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -613,6 +755,7 @@ export function cleanText(b, j, raw) {
     if (b === 'quiz' && j.quizzes) return JSON.stringify(j.quizzes.length === 1 ? j.quizzes[0] : j.quizzes, null, 2);
     if (b === 'creatives_prompt' && j.prompt) return j.prompt;
     if (b === 'creatives_prompt' && j.prompts) return j.prompts.map(function (p) { return '#' + p.index + ' ' + (p.headline || '') + '\n' + p.prompt + '\nCTA: ' + (p.cta || ''); }).join('\n\n');
+    if (b === 'creative_analysis') return JSON.stringify({ analysis: j.analysis || {}, variations: j.variations || [] }, null, 2);
     if (b === 'audios' && j.audios) return j.audios.map(function (a) { return '#' + a.index + ' [' + a.voice + ']\n' + a.script; }).join('\n\n');
     if (b === 'image_prompts') { const o = (j.onboard || []).map(function (x) { return x.step + ': ' + x.prompt; }).join('\n'); const s = (j.sequence || []).map(function (x) { return 'r' + x.route + ' ' + x.step + ': ' + x.prompt; }).join('\n'); return 'ONBOARD:\n' + o + '\n\nSEQUÊNCIA:\n' + s; }
   } catch (e) {}

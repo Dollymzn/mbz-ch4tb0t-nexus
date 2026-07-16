@@ -120,6 +120,20 @@ test('buildBlockPrompt — creatives_prompt injeta o guia também no branch imgO
   assert.ok(svg.includes('hierarquia visual clara'));
 });
 
+test('buildBlockPrompt — criativo completo manda renderizar o botão de CTA e proíbe área vazia (regressão faixa branca)', () => {
+  const full = buildBlockPrompt('creatives_prompt', { niche: 'Cartão de Crédito', creativePlatform: 'google_flow', creativeType: 'completo', creativeSize: '1080x1350', numCreatives: 5, flowLang: 'pt-BR' });
+  // deve mandar DESENHAR o botão e preencher o frame...
+  assert.ok(/BOT[ÃA]O DE CTA DESENHADO/i.test(full));
+  assert.ok(full.includes('PREENCHE O FRAME INTEIRO'));
+  // ...e proibir explicitamente reservar área vazia (a causa da faixa branca)
+  assert.ok(full.includes('space for text overlay'));
+  assert.ok(/PROIBIDO instruir/i.test(full));
+  // o branch imagem-only CONTINUA reservando espaço (workflow Canva) — não pode ter a regra de completo
+  const imgOnly = buildBlockPrompt('creatives_prompt', { niche: 'Cartão de Crédito', creativePlatform: 'google_flow', creativeType: 'imagem', creativeSize: '1080x1350', numCreatives: 5 });
+  assert.ok(!imgOnly.includes('PREENCHE O FRAME INTEIRO'));
+  assert.ok(imgOnly.includes('space for text overlay'));
+});
+
 test('buildBlockPrompt — onboard com utmNative:true troca a instrução de UTM', () => {
   const prompt = buildBlockPrompt('onboard', { niche: 'Carta de Amor', utmNative: true, onboardRoutes: 3, flowLang: 'en-US' });
   assert.ok(prompt.includes('SEM query string'));

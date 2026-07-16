@@ -17,7 +17,7 @@ const STEP_LABELS = ['Nicho', 'Idioma & Voz', 'Estrutura', 'Criativos', 'Gerar']
 const FIELD_IDS = ['niche', 'geoCountry', 'campaignLang', 'pageName', 'flowLang', 'contentLang', 'currency',
   'persona', 'modelWizard', 'onboardRoutes', 'onboardRouteType', 'seqRoutes', 'numP1', 'gridCols', 'gridRows',
   'numCreatives', 'creativePlatform', 'creativeSize'];
-const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'utmNative'];
+const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'utmNative', 'agentQuality'];
 
 let curStep = 1;
 const totalSteps = 5;
@@ -73,6 +73,7 @@ function wireWizard() {
   $$('input[name=creativeType]').forEach(function (r) { r.onchange = function () { updateCreativeUI(); syncBlockToggles(); }; });
   $('#imagePrompts').onchange = syncBlockToggles;
   $('#wantAudios').onchange = syncBlockToggles;
+  $('#agentQuality').onchange = function () { updateSummary(); scheduleDraft(); };
 
   // auto-save do rascunho: qualquer input/change no wizard
   const wiz = $('#wizard');
@@ -157,10 +158,15 @@ export function selectedBlocks() { return $$('.blk.on').map(function (d) { retur
 export function updateSummary() {
   const c = +$('#gridCols').value || 1, r = +$('#gridRows').value || 1;
   const blocks = selectedBlocks();
+  const reviewable = ['onboard', 'sequence', 'meta_copy', 'creatives_prompt'].filter(function (b) { return blocks.indexOf(b) >= 0; }).length;
+  const ag = $('#agentQuality');
+  const hint = $('#agentCostHint');
+  if (hint) hint.textContent = '+ até ' + (ag && ag.checked ? reviewable : 0) + ' revisões nesta run';
   const s = $('#summary'); if (!s) return;
   s.innerHTML = 'Vou gerar <b>' + esc($('#niche').value || '(nicho)') + '</b> com <b>' + esc($('#seqRoutes').value) +
     '</b> sequência(s) completas, <b>' + esc($('#numP1').value) + '</b> P1 (+ ' + esc($('#numP1').value) +
-    ' quizzes), grid <b>' + c + '×' + r + '</b> = <b>' + (c * r) + '</b> P2s.<br>Blocos: <b>' + blocks.length + '</b> selecionados.';
+    ' quizzes), grid <b>' + c + '×' + r + '</b> = <b>' + (c * r) + '</b> P2s.<br>Blocos: <b>' + blocks.length + '</b> selecionados.' +
+    (ag && ag.checked ? '<br><span class="agent-cost-line">🛡 Agente ligado: + até ' + reviewable + ' revisões nesta run.</span>' : '');
 }
 
 /* ---------- collectParams (SEM platform) ---------- */

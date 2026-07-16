@@ -22,7 +22,7 @@ export const state = {
   userKey: localStorage.getItem(K.key) || '',
   params: {},                                   // params do wizard (collectParams)
   artifacts: {},                                // cache de artifacts de TODO block_done
-  results: {}                                   // block -> { json, raw, artifacts, warnings, status }
+  results: {}                                   // block -> { json, raw, artifacts, warnings, status, review?, attempt? }
 };
 
 /* ---------- setters persistidos ---------- */
