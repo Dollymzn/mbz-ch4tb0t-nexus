@@ -90,6 +90,22 @@ test('buildBlockPrompt(creative_analysis) — injeta as regras da plataforma e o
   assert.ok(prompt.includes('variations'));
 });
 
+test('buildBlockPrompt(creative_analysis) — detecta nicho/idioma da IMAGEM e não injeta o nicho do wizard (regressão variações místicas/inglês)', () => {
+  // wizard num funil místico em inglês, mas o criativo enviado é de finanças em PT:
+  const prompt = buildBlockPrompt('creative_analysis', {
+    niche: 'tarot místico', personaLabel: 'vidente', flowLang: 'en-US',
+    creative_analysis: { platform: 'google_flow', nVariations: 5, size: '1080x1350', flowLang: 'en-US', images: [{ media_type: 'image/jpeg', data: 'x' }] }
+  });
+  // o nicho/idioma do wizard NÃO podem virar diretiva do prompt
+  assert.ok(!/^NICHO: tarot/m.test(prompt));
+  assert.ok(!prompt.includes('IDIOMA DOS TEXTOS (headline/cta): en-US'));
+  // deve mandar detectar da própria imagem e travar o nicho
+  assert.ok(/da própria imagem|EXCLUSIVAMENTE do criativo/i.test(prompt));
+  assert.ok(/nunca troca de nicho|vira outro nicho/i.test(prompt));
+  assert.ok(prompt.includes('niche_detectado'));
+  assert.ok(prompt.includes('idioma_detectado'));
+});
+
 // ---- platformPromptRules (§5.3) ----
 
 test('platformPromptRules — google_flow e midjourney retornam as regras corretas por plataforma', () => {

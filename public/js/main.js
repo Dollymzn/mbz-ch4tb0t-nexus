@@ -366,15 +366,16 @@ function runCreativeAnalysis() {
     });
     return { media_type: im.media_type, data: im.data, metrics: metrics };
   });
+  // 100% dirigido pela imagem: NÃO enviar niche/persona/flowLang do wizard — eles
+  // contaminavam as variações (ex: persona mística do funil aberto virava cartomante
+  // num criativo de crédito; flowLang do chatbot forçava inglês). O backend detecta
+  // nicho e idioma da própria imagem (REGRA-MÃE em blocks.js creative_analysis).
   const params = {
     creative_analysis: {
       images: images,
       platform: $('#optCreativePlatform').value,
       nVariations: +$('#optCreativeVariations').value || 8,
-      niche: state.params.niche || $('#niche').value.trim(),
-      persona: state.params.personaLabel || '',
-      size: $('#creativeSize').value || '1080x1440',
-      flowLang: state.params.flowLang || $('#flowLang').value || 'en-US'
+      size: $('#creativeSize').value || '1080x1440'
     }
   };
   const out = $('#optCreativeOutput'); out.innerHTML = '';

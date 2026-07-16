@@ -576,6 +576,12 @@ function sanitize(b, j, raw, ctx) {
       const analysis = j.analysis || {};
       const vars = j.variations || [];
       let h = '<span class="tag">DNA DO CRIATIVO</span>';
+      if (analysis.niche_detectado || analysis.idioma_detectado) {
+        h += '<div class="kv"><h4>Detectado da imagem</h4><p>' +
+          (analysis.niche_detectado ? '<span class="tag">nicho: ' + esc(analysis.niche_detectado) + '</span> ' : '') +
+          (analysis.idioma_detectado ? '<span class="tag">idioma: ' + esc(analysis.idioma_detectado) + '</span>' : '') +
+          '<br><small style="color:var(--muted)">as variações são geradas neste nicho e idioma</small></p></div>';
+      }
       if (analysis.dna) h += '<div class="kv"><h4>DNA</h4><p>' + esc(analysis.dna) + '</p></div>';
       if (analysis.porque_venceu) h += '<div class="kv"><h4>Por que venceu</h4><p>' + esc(analysis.porque_venceu) + '</p></div>';
       if (analysis.elementos_chave && analysis.elementos_chave.length) h += '<div class="kv"><h4>Elementos-chave</h4>' + ulist(analysis.elementos_chave) + '</div>';
