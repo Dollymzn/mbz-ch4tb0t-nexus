@@ -9,7 +9,7 @@ Dois blocos novos, seguindo os padrões de ARCHITECTURE-V3.md/AGENT-V31.md. Exte
 
 ### BLOCK_META
 ```js
-persona_identity: { maxTokens: 2500, deps: [], kind: 'text', requireJson: () => true, postprocess: null,
+persona_identity: { maxTokens: 64000, deps: [], kind: 'text', requireJson: () => true, postprocess: null,
   artifacts: json => (json && json.identity) ? { personaIdentity: json.identity } : undefined }
 ```
 Entra em KNOWN_BLOCKS (bloco real; testes de contagem passam de 16 → 18 — mudança INTENCIONAL).
@@ -61,7 +61,7 @@ nas deps. Fora da run → sem efeito (retrocompat).
 
 ### BLOCK_META
 ```js
-video_prompts: { maxTokens: 20000, deps: ['creatives_prompt','audios','persona_identity'],
+video_prompts: { maxTokens: 64000, deps: ['creatives_prompt','audios','persona_identity'],
   kind: 'text', requireJson: () => true, postprocess: null }
 ```
 Entra em KNOWN_BLOCKS.

@@ -13,14 +13,14 @@ const { pickBest } = require('../lib/orchestrator');
 
 // ---- BLOCK_META dos blocos sintéticos (§3.6) ----
 
-test('BLOCK_META — review tem maxTokens 1500', () => {
+test('BLOCK_META — review tem maxTokens 8000', () => {
   assert.ok(BLOCK_META.review);
-  assert.equal(BLOCK_META.review.maxTokens, 1500);
+  assert.equal(BLOCK_META.review.maxTokens, 8000);
 });
 
-test('BLOCK_META — creative_analysis tem maxTokens 16000 e hasImages true', () => {
+test('BLOCK_META — creative_analysis tem maxTokens 64000 e hasImages true', () => {
   assert.ok(BLOCK_META.creative_analysis);
-  assert.equal(BLOCK_META.creative_analysis.maxTokens, 16000);
+  assert.equal(BLOCK_META.creative_analysis.maxTokens, 64000);
   assert.equal(BLOCK_META.creative_analysis.hasImages, true);
 });
 

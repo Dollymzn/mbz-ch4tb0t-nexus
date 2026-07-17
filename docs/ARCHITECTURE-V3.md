@@ -69,7 +69,7 @@ de regenerar apontando a dependência.
 Scheduler: pool topológico orientado a eventos (`pending → ready → running → done|failed|skipped`).
 Semáforo `MAX_CONCURRENCY` (env, default 3). Falha marca dependentes transitivos como skipped.
 
-maxTokens: 20000 (onboard, sequence, creatives_prompt, audios, quiz), 24000 (optimize), 7000 (resto).
+maxTokens: 64000 uniforme em todos os blocos de geração (v3.2b: teto máximo seguro — qualidade sobre custo; Haiku 4.5 limita a 64K) e 8000 no review.
 
 ## 4. Módulos
 

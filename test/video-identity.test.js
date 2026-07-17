@@ -19,10 +19,10 @@ const ID_MARK = 'IDENTIDADE VISUAL FIXA DA PERSONA';
 
 // ---- §1/§2: BLOCK_META + artifacts dos 2 blocos novos ----
 
-test('BLOCK_META — persona_identity: maxTokens 2500, deps [], kind text, requireJson true', () => {
+test('BLOCK_META — persona_identity: maxTokens 64000, deps [], kind text, requireJson true', () => {
   const m = BLOCK_META.persona_identity;
   assert.ok(m, 'persona_identity deve existir em BLOCK_META');
-  assert.equal(m.maxTokens, 2500);
+  assert.equal(m.maxTokens, 64000);
   assert.deepEqual(m.deps, []);
   assert.equal(m.kind, 'text');
   assert.equal(typeof m.requireJson, 'function');
@@ -37,10 +37,10 @@ test('BLOCK_META — persona_identity.artifacts extrai personaIdentity de {ident
   assert.equal(art(null), undefined);
 });
 
-test('BLOCK_META — video_prompts: maxTokens 20000, deps [creatives_prompt,audios,persona_identity], requireJson true', () => {
+test('BLOCK_META — video_prompts: maxTokens 64000, deps [creatives_prompt,audios,persona_identity], requireJson true', () => {
   const m = BLOCK_META.video_prompts;
   assert.ok(m, 'video_prompts deve existir em BLOCK_META');
-  assert.equal(m.maxTokens, 20000);
+  assert.equal(m.maxTokens, 64000);
   assert.deepEqual(m.deps, ['creatives_prompt', 'audios', 'persona_identity']);
   assert.equal(m.kind, 'text');
   assert.equal(m.requireJson(), true);

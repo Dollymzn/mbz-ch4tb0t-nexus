@@ -46,25 +46,11 @@ test('grafo de dependências — blocos independentes não têm deps', () => {
   });
 });
 
-test('maxTokens — 20000 para onboard, sequence, creatives_prompt, audios, quiz, video_prompts', () => {
-  ['onboard', 'sequence', 'creatives_prompt', 'audios', 'quiz', 'video_prompts'].forEach(b => {
-    assert.equal(BLOCK_META[b].maxTokens, 20000, `"${b}" deveria ter maxTokens 20000`);
-  });
-});
-
-test('maxTokens — 24000 para optimize', () => {
-  assert.equal(BLOCK_META.optimize.maxTokens, 24000);
-});
-
-test('maxTokens — 2500 para persona_identity', () => {
-  assert.equal(BLOCK_META.persona_identity.maxTokens, 2500);
-});
-
-test('maxTokens — 7000 para o resto dos blocos', () => {
-  const resto = EXPECTED_BLOCKS.filter(b =>
-    !['onboard', 'sequence', 'creatives_prompt', 'audios', 'quiz', 'optimize', 'video_prompts', 'persona_identity'].includes(b));
-  resto.forEach(b => {
-    assert.equal(BLOCK_META[b].maxTokens, 7000, `"${b}" deveria ter maxTokens 7000`);
+test('maxTokens — 64000 uniforme em todos os blocos de geração (v3.2b: qualidade > custo; teto, não alvo)', () => {
+  // Regressão do MAX_TOKENS truncando image_prompts em funis grandes: o teto agora é
+  // o máximo seguro para todos os modelos do catálogo (Haiku 4.5 = 64K de saída).
+  EXPECTED_BLOCKS.forEach(b => {
+    assert.equal(BLOCK_META[b].maxTokens, 64000, `"${b}" deveria ter maxTokens 64000`);
   });
 });
 
