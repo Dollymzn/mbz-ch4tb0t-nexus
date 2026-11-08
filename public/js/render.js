@@ -28,8 +28,9 @@ export const BLOCKS = [
   { id: 'meta_onboard',    name: 'Onboard Meta',      hint: 'texto',             kind: 'text',          def: true },
   { id: 'image_prompts',   name: 'Prompts de Imagem', hint: 'fluxo',             kind: 'text',          def: false, needsToggle: 'imagePrompts' },
   { id: 'creatives_prompt',name: 'Criativos',         hint: 'prompts',           kind: 'text',          def: false, needsToggle: 'wantCreatives' },
-  { id: 'audios',          name: 'Áudios v3',         hint: 'ElevenLabs',        kind: 'text',          def: false, needsToggle: 'wantAudios' },
-  { id: 'video_prompts',   name: 'Vídeos (Veo)',      hint: 'clipes 8s',         kind: 'text',          def: false, needsToggle: 'wantVideos' }
+  { id: 'audios',          name: 'Áudios v4',         hint: 'ElevenLabs v4',     kind: 'text',          def: false, needsToggle: 'wantAudios' },
+  { id: 'video_prompts',   name: 'Vídeos (Veo 3.1)',  hint: 'clipes 8s',         kind: 'text',          def: false, needsToggle: 'wantVideos' },
+  { id: 'broadcast',       name: 'Broadcasts',        hint: 'templates em massa', kind: 'json-download', def: false, needsToggle: 'wantBroadcasts' }
 ];
 export const BLABEL = {};
 BLOCKS.forEach(function (b) { BLABEL[b.id] = b.name; });
@@ -448,6 +449,7 @@ function renderCardBody(card) {
   if (card.mode === 'chat') { card.bodyEl.innerHTML = renderChat(json, raw); return; }
   if (b === 'grid_preview') { card.bodyEl.innerHTML = '<div class="clean-view">' + renderDirection(json || safeParse(raw)) + '</div>'; return; }
   if (b === 'grid') { const ctx = { ip: [], quiz: [] }; card.bodyEl.innerHTML = renderGridView(json, raw, ctx); bindBody(card, ctx); return; }
+  if (b === 'broadcast') { card.bodyEl.innerHTML = renderBroadcastView(json, raw); bindJsonToggle(card); return; }
   if (b === 'optimize') { card.bodyEl.innerHTML = '<pre>' + esc(json ? JSON.stringify(json, null, 2) : (raw || '')) + '</pre>'; return; }
 
   if (kindOf(b) === 'json-download') {
@@ -459,7 +461,8 @@ function renderCardBody(card) {
   }
 }
 
-// grid: itens com título + link Pinterest, JSON de importação recolhível
+// grid (formato ago/2026): foto REAL resolvida (thumb) + pexels_search + image_prompt
+// 1:1 + item_link Pinterest, avisos do resolvedor multi-provider, JSON recolhível.
 function renderGridView(j, raw, ctx) {
   if (!j) j = safeParse(raw);
   if (!j || !j.items) return '<pre>' + esc(raw || '') + '</pre>';
@@ -467,21 +470,76 @@ function renderGridView(j, raw, ctx) {
   let h = '<div class="clean-view">';
   if (g.title) h += '<h4>' + esc(g.title) + '</h4>';
   if (g.subtitle) h += '<p style="color:var(--muted);margin-bottom:12px">' + esc(g.subtitle) + '</p>';
+  // status do resolvedor de fotos (lib/photos no backend)
+  if (j._pexels === 'missing_key') {
+    h += '<p class="grid-photo-warn">⚠ Nenhuma key de foto configurada (PEXELS_API_KEY / PIXABAY_API_KEY / UNSPLASH_ACCESS_KEY no Railway) — os itens saíram sem foto real; use o termo de busca manualmente.</p>';
+  } else if (j._pexels === 'no_results') {
+    h += '<p class="grid-photo-warn">⚠ Nenhuma foto encontrada nos providers — confira os termos de busca.</p>';
+  } else if (j._pexels && String(j._pexels).indexOf('resolved:') === 0) {
+    h += '<p class="grid-photo-ok">✓ Fotos reais resolvidas via ' + esc(String(j._pexels).slice(9)) + '</p>';
+  }
   h += '<div style="display:flex;flex-direction:column;gap:8px">';
   j.items.forEach(function (it, i) {
-    const pin = it.item_image || '';
-    const url = 'https://www.pinterest.com/search/pins/?q=' + encodeURIComponent(pin);
-    const id = ctx.ip.length; ctx.ip.push(pin);
-    h += '<div class="kv" style="padding-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
-      '<b>' + (i + 1) + '. ' + esc(it.item_title || '') + '</b>' +
-      '<button class="mini-btn ipcopy" data-ip="' + id + '">copiar busca</button></div>' +
-      '<p style="margin-top:4px"><span class="pin">📌 ' + esc(pin) + '</span> &nbsp;<a href="' + esc(url) + '" target="_blank" rel="noopener" style="color:var(--cyan);font-size:12px">abrir no Pinterest ↗</a></p></div>';
+    const photo = safeUrl(it.item_image || '');
+    const search = it.pexels_search || '';
+    const iprompt = it.image_prompt || '';
+    const link = safeUrl(it.item_link || '');
+    h += '<div class="kv grid-item-row" style="padding-bottom:10px">';
+    h += '<div style="display:flex;gap:10px;align-items:flex-start">';
+    if (photo) h += '<img class="grid-thumb" src="' + esc(photo) + '" alt="" loading="lazy">';
+    h += '<div style="flex:1;min-width:0">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>' + (i + 1) + '. ' + esc(it.item_title || '') + '</b></div>';
+    if (search) {
+      const sid = ctx.ip.length; ctx.ip.push(search);
+      h += '<p style="margin-top:4px"><span class="pin">📷 ' + esc(search) + '</span> <button class="mini-btn ipcopy" data-ip="' + sid + '">copiar busca</button></p>';
+    }
+    if (iprompt) {
+      const pid = ctx.ip.length; ctx.ip.push(iprompt);
+      h += '<p style="margin-top:4px;color:var(--muted);font-size:12px">🎨 ' + esc(iprompt) + ' <button class="mini-btn ipcopy" data-ip="' + pid + '">copiar prompt 1:1</button></p>';
+    }
+    if (link) h += '<p style="margin-top:4px"><a href="' + esc(link) + '" target="_blank" rel="noopener" style="color:var(--cyan);font-size:12px">abrir busca no Pinterest ↗</a></p>';
+    h += '</div></div></div>';
   });
   h += '</div>';
   h += '<div style="margin-top:14px"><button class="mini-btn gridJsonToggle">▼ ver JSON de importação</button>' +
-    '<pre class="gridJsonRaw" style="display:none;margin-top:8px">' + esc(JSON.stringify(j, null, 2)) + '</pre></div>';
+    '<pre class="gridJsonRaw" style="display:none;margin-top:8px">' + esc(JSON.stringify(exportJson('grid', j), null, 2)) + '</pre></div>';
   h += '</div>';
   return h;
+}
+
+// v4: broadcasts — resumo + amostra dos 6 primeiros + JSON de importação recolhível.
+function renderBroadcastView(j, raw) {
+  const list = Array.isArray(j) ? j : safeParse(raw);
+  if (!Array.isArray(list)) return '<pre>' + esc(raw || '') + '</pre>';
+  const langs = {};
+  list.forEach(function (b) { const L = b.language || '?'; langs[L] = (langs[L] || 0) + 1; });
+  let h = '<div class="clean-view">';
+  h += '<span class="tag">' + list.length + ' TEMPLATES · UTILITY · ' + esc(Object.keys(langs).join(', ')) + '</span>';
+  h += '<p style="color:var(--muted);font-size:12px;margin:8px 0 10px">names e bodies 100% únicos · sem emoji no body · URL broadutility exata · amostra dos 6 primeiros:</p>';
+  list.slice(0, 6).forEach(function (b, i) {
+    h += '<div class="kv"><div style="display:flex;justify-content:space-between;gap:8px"><b>' + esc(b.header_title || '') + '</b><span class="pin">' + esc(b.name || '') + '</span></div>' +
+      '<p style="white-space:pre-wrap;margin-top:4px">' + esc(b.body_text || '') + '</p>' +
+      (b.buttons && b.buttons[0] ? '<p style="margin-top:4px"><span class="tag">' + esc(b.buttons[0].text || '') + '</span></p>' : '') +
+      '</div>';
+  });
+  if (list.length > 6) h += '<p style="color:var(--muted);font-size:12px">… + ' + (list.length - 6) + ' no JSON.</p>';
+  h += '<div style="margin-top:14px"><button class="mini-btn gridJsonToggle">▼ ver JSON de importação (' + list.length + ' itens)</button>' +
+    '<pre class="gridJsonRaw" style="display:none;margin-top:8px">' + esc(JSON.stringify(list, null, 2)) + '</pre></div>';
+  h += '</div>';
+  return h;
+}
+
+// bind só do toggle de JSON (broadcast e outros cards sem ctx de cópia)
+function bindJsonToggle(card) {
+  const body = card.bodyEl;
+  const gt = body.querySelector('.gridJsonToggle');
+  if (gt) gt.addEventListener('click', function (e) {
+    e.stopPropagation();
+    const r = body.querySelector('.gridJsonRaw');
+    const show = r.style.display === 'none';
+    r.style.display = show ? 'block' : 'none';
+    gt.textContent = (show ? '▲' : '▼') + ' ' + gt.textContent.slice(2);
+  });
 }
 
 // grid_preview -> prévia visual (paleta/fonte/mock) — portado do v2 showGridDirection
@@ -544,6 +602,23 @@ function sanitize(b, j, raw, ctx) {
       return j.quizzes.map(function (item, i) {
         const ov = item.overlay || item;
         const qi = ctx.quiz.length; ctx.quiz.push(item);
+        // v4 — Direct Offerwall (schema v2): anatomia própria, sem modos/roleta
+        if (j.format === 'offerwall' || ov.experience_type === 'direct_offerwall') {
+          let h = '<div class="kv offerwall-card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+            '<span class="tag">OFFERWALL ' + (i + 1) + ' · ' + esc(ov.offerwall_mode || '') + ' · paleta: ' + esc(ov.theme_palette || '') + '</span>' +
+            '<button class="mini-btn dl qdl" data-qi="' + qi + '">⬇ .json</button></div>';
+          if (ov.offerwall_eyebrow) h += '<p class="ow-eyebrow">' + esc(ov.offerwall_eyebrow) + '</p>';
+          h += '<h4>' + esc(ov.offerwall_icon || '') + ' ' + esc(ov.offerwall_title || '') + '</h4>';
+          if (ov.offerwall_body) h += '<p>' + esc(ov.offerwall_body) + '</p>';
+          h += '<p style="font-size:12px;color:var(--muted)">' +
+            (ov.offerwall_highlight ? '<b>Destaque:</b> ' + esc(ov.offerwall_highlight) + ' · ' : '') +
+            (ov.offerwall_meta_text ? '<b>Meta:</b> ' + esc(ov.offerwall_meta_text) + '<br>' : '') +
+            '<b>CTA:</b> <span class="tag">' + esc(ov.offerwall_cta_label || '') + '</span>' +
+            (ov.offerwall_timer_label ? ' · <b>Timer ' + (ov.offerwall_timer_seconds || 300) + 's:</b> ' + esc(ov.offerwall_timer_label) : '') +
+            (ov.offerwall_expired_title ? '<br><b>Expirado:</b> ' + esc(ov.offerwall_expired_title) + ' — ' + esc(ov.offerwall_expired_note || '') : '') +
+            '</p></div>';
+          return h;
+        }
         let h = '<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="tag">QUIZ ' + (i + 1) + ' · modo: ' + esc(ov.entry_mode || '') + ' · paleta: ' + esc(ov.theme_palette || '') + '</span><button class="mini-btn dl qdl" data-qi="' + qi + '">⬇ .json</button></div>';
         h += '<h4>' + esc((ov.qlist && ov.qlist[0] && ov.qlist[0].title) || '') + '</h4>';
         const vq = ov.visual_questions && ov.visual_questions[0];
@@ -628,7 +703,10 @@ function sanitize(b, j, raw, ctx) {
       }
     }
     if (b === 'audios' && j.audios) {
-      return j.audios.map(function (a) { return '<div class="kv"><span class="tag">#' + (a.index || '') + ' · voz: ' + esc(a.voice || '') + '</span><p>' + esc(a.script || '') + '</p></div>'; }).join('');
+      return j.audios.map(function (a) {
+        const stab = (a.stability != null && a.stability !== '') ? ' · stability ' + esc(a.stability) : '';
+        return '<div class="kv"><span class="tag">#' + (a.index || '') + ' · voz: ' + esc(a.voice || '') + stab + '</span><p style="white-space:pre-wrap">' + esc(a.script || '') + '</p></div>';
+      }).join('');
     }
     // v3.2a — identidade visual fixa da persona (mesmo rosto em todo o funil)
     if (b === 'persona_identity') {
@@ -642,14 +720,14 @@ function sanitize(b, j, raw, ctx) {
       if (id.avoid) h += '<div class="kv"><h4>Nunca alterar</h4><p>' + esc(id.avoid) + '</p></div>';
       return h;
     }
-    // v3.2a — criativos de vídeo Veo 3 / Google Flow (clipes de ~8s, 9:16)
+    // v3.2a/v4 — criativos de vídeo Veo 3.1 / Google Flow (clipes de ~8s, 9:16 ou 16:9)
     if (b === 'video_prompts' && j.videos) {
-      const head = '<span class="tag">' + esc(j.platform || 'veo_flow') + ' · ' + esc(j.format || '9:16') + ' · ' + j.videos.length + ' vídeos</span>';
+      const head = '<span class="tag">VEO 3.1 · ' + esc(j.format || '9:16') + ' · ' + j.videos.length + ' vídeos</span>';
       return head + j.videos.map(function (v) {
         const beats = v.beats || {};
         const pid = ctx.ip.length; ctx.ip.push(v.prompt || '');
         let h = '<div class="kv"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
-          '<b>#' + esc(v.index || '') + ' · ' + esc(v.concept || '') + '</b>' +
+          '<b>#' + esc(v.index || '') + (v.style ? ' · <span class="pin">' + esc(v.style) + '</span>' : '') + ' · ' + esc(v.concept || '') + '</b>' +
           '<button class="mini-btn ipcopy" data-ip="' + pid + '">copiar prompt</button></div>';
         h += '<div class="video-beats">';
         if (beats.hook_0_2s) h += '<p><span class="beat-label">0–2s hook</span> ' + esc(beats.hook_0_2s) + '</p>';
@@ -762,16 +840,29 @@ function copyToBtn(btn, text, restore) {
     setTimeout(function () { btn.textContent = restore || old; }, 1200);
   });
 }
+// v4: JSON de EXPORTAÇÃO limpo — o grid carrega campos de trabalho (_pexels, pexels_search,
+// image_prompt) que servem só à view; o arquivo importado no plugin MIRB sai sem eles.
+export function exportJson(block, json) {
+  if (!json || block !== 'grid' || !Array.isArray(json.items)) return json;
+  const out = Object.assign({}, json);
+  delete out._pexels;
+  out.items = json.items.map(function (it) {
+    const c = Object.assign({}, it);
+    delete c.pexels_search; delete c.image_prompt;
+    return c;
+  });
+  return out;
+}
 function doCopy(card) {
   const b = card.block;
   const json = card.json, raw = card.raw;
   let txt;
-  if (kindOf(b) === 'json-download') txt = json ? JSON.stringify(json, null, 2) : raw;
+  if (kindOf(b) === 'json-download') txt = json ? JSON.stringify(exportJson(b, json), null, 2) : raw;
   else txt = cleanText(b, json || safeParse(raw), raw);
   copyToBtn(card.cpBtn, txt || '', 'copiar');
 }
 function doDownload(card) {
-  const b = card.block, json = card.json;
+  const b = card.block, json = exportJson(card.block, card.json);
   if (!json) { toast('JSON inválido — veja o conteúdo.'); return; }
   const name = (state.params.niche || 'funil').toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const fn =
@@ -779,6 +870,7 @@ function doDownload(card) {
     b === 'sequence' ? 'sequencia-' + name + '.json' :
     b === 'grid' ? 'mirb-grid-' + name + '.json' :
     b === 'comment' ? 'comentarios-' + name + '.json' :
+    b === 'broadcast' ? 'broadcasts-' + name + '.json' :
     b === 'optimize' ? 'otimizado-' + name + '.json' :
     b + '-' + name + '.json';
   downloadJson(json, fn);

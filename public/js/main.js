@@ -8,7 +8,7 @@
 import { state, esc, toast, setModel, setUserKey, setAccessPass, resetRun, mergeArtifacts } from './state.js';
 import { initFX, startClock } from './fx.js';
 import { getConfig, auth, getHistory, saveHistory, deleteHistory } from './api.js';
-import { makeRunView } from './render.js';
+import { makeRunView, exportJson } from './render.js';
 import { initWizard, collectParams, selectedBlocks, gotoStep } from './wizard.js';
 import './anim.js'; // efeitos que exigem JS: boot do gate, ripple, View Transitions
 
@@ -35,7 +35,15 @@ function loadConfig() {
     fillSel('#optCreativePlatform', cfg.creativePlatforms, 'id', 'label', 'google_flow');
     fillSel('#creativeSize', cfg.creativeSizes, 'id', 'label', '1080x1440');
     // modelo: catálogo vem do backend (contrato §1) — nunca hardcodado
-    if (!state.model && Array.isArray(cfg.models) && cfg.models.length) setModel(cfg.models[0].id);
+    // v4: migra id de modelo antigo salvo no localStorage (ex.: claude-sonnet-5 / opus-4-8 da v3)
+    // — se não está no catálogo atual, cai pro recomendado em vez de mandar id morto pra API.
+    if (Array.isArray(cfg.models) && cfg.models.length) {
+      const known = cfg.models.some(function (m) { return m.id === state.model; });
+      if (!state.model || !known) {
+        if (state.model && !known) toast('Modelo ' + state.model + ' saiu do catálogo → ' + cfg.models[0].id);
+        setModel(cfg.models[0].id);
+      }
+    }
     ['#optModel', '#modelGlobal', '#modelWizard'].forEach(fillModels);
     $('#modelFoot').textContent = 'modelo: ' + (state.model || '—');
     if (cfg.needPassword && !state.accessPass) showGate(); else verifyEnter();
@@ -144,7 +152,12 @@ function runForge() {
   // a identidade visual fixa da persona é injetada em todo prompt de imagem/vídeo. Se a
   // run tem algum bloco visual, não pediu persona_identity e não há identidade em cache,
   // gera o character sheet PRIMEIRO (unshift) — mesmo padrão do grid_preview acima.
-  const VISUAL_BLOCKS = ['fb_images', 'image_prompts', 'creatives_prompt', 'video_prompts'];
+  // v4: com estilo "alt" (sem persona), criativos/vídeos NÃO precisam da identidade —
+  // só fb_images/image_prompts contam como visuais nesse caso.
+  const noPersonaStyle = state.params.creativeStyle === 'alt';
+  const VISUAL_BLOCKS = noPersonaStyle
+    ? ['fb_images', 'image_prompts']
+    : ['fb_images', 'image_prompts', 'creatives_prompt', 'video_prompts'];
   if (blocks.some(function (b) { return VISUAL_BLOCKS.indexOf(b) >= 0; }) &&
       blocks.indexOf('persona_identity') < 0 &&
       !(state.artifacts && state.artifacts.personaIdentity)) {
@@ -454,13 +467,13 @@ function wireOutputActions() {
   };
   $('#downloadAll').onclick = function () {
     let n = 0;
-    ['onboard', 'sequence', 'grid'].forEach(function (b) { const r = state.results[b]; if (r && r.json) { dlJson(r.json, downloadName(b)); n++; } });
+    ['onboard', 'sequence', 'grid', 'comment', 'broadcast'].forEach(function (b) { const r = state.results[b]; if (r && r.json) { dlJson(exportJson(b, r.json), downloadName(b)); n++; } });
     if (!n) toast('Nenhum JSON para baixar.');
   };
 }
 function downloadName(b) {
   const name = (state.params.niche || 'funil').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  return (b === 'sequence' ? 'sequencia' : b === 'grid' ? 'mirb-grid' : b) + '-' + name + '.json';
+  return (b === 'sequence' ? 'sequencia' : b === 'grid' ? 'mirb-grid' : b === 'comment' ? 'comentarios' : b === 'broadcast' ? 'broadcasts' : b) + '-' + name + '.json';
 }
 function dlJson(obj, fn) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });

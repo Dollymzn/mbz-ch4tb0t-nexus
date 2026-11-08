@@ -141,18 +141,6 @@
           <h2 class="step-title">Estrutura do funil</h2>
           <p class="step-help">Defina a plataforma e o tamanho de cada peça. As P2 são calculadas pelo formato do grid.</p>
 
-          <div class="platform-pick">
-            <label class="platform-opt">
-              <input type="radio" name="platform" value="chatdrink" checked>
-              <div class="platform-box"><b>ChatDrink</b><span>proprietário · sem limite de páginas</span></div>
-            </label>
-            <label class="platform-opt">
-              <input type="radio" name="platform" value="chatfood">
-              <div class="platform-box"><b>ChatFood</b><span>multi-idioma · limite de páginas</span></div>
-            </label>
-          </div>
-          <div class="warn-strip">⚠️ ChatDrink e ChatFood usam formatos JSON diferentes. A ferramenta gera o correto pra plataforma escolhida.</div>
-
           <div class="steppers">
             <div class="stepper">
               <label>Rotas no onboard</label>
@@ -174,13 +162,6 @@
               <label>Quantidade de P1 (= nº de quizzes)</label>
               <div class="stepper-ctrl"><button data-dec="numP1">−</button><input type="number" id="numP1" value="7" min="1" max="20"><button data-inc="numP1">+</button></div>
             </div>
-            <div class="stepper">
-              <label>Formato do Quiz Overlay</label>
-              <select id="quizFormat">
-                <option value="offerwall" selected>Direct Offerwall (v4.8.2)</option>
-                <option value="classic">Clássico — 10 modos (v4.1.0)</option>
-              </select>
-            </div>
           </div>
 
           <div class="grid-builder">
@@ -192,6 +173,22 @@
               <div class="grid-result"><span id="gridCalc">8</span> P2s</div>
             </div>
             <div class="grid-preview" id="gridPreview"></div>
+          </div>
+
+          <div class="card-grid" style="margin-top:14px">
+            <div class="sel-card">
+              <label>🧩 Formato do Quiz Overlay</label>
+              <select id="quizFormat">
+                <option value="offerwall" selected>Direct Offerwall (4.8.2 · padrão)</option>
+                <option value="classic">Quiz clássico (4.1.0 · 10 modos)</option>
+              </select>
+              <small>Offerwall = rewarded direto, converte mais</small>
+            </div>
+          </div>
+
+          <div class="toggle-card">
+            <label class="switch"><input type="checkbox" id="utmNative"><span class="slider"></span></label>
+            <div class="toggle-info"><b>🔗 Rastreamento UTM do ChatDrink</b><span>Ativo: links saem só com {{URL_REDIR}} (o ChatDrink cuida das UTMs). Inativo: UTMs completas nos links.</span></div>
           </div>
         </div>
 
@@ -219,22 +216,22 @@
               </label>
               <label class="ctype-opt">
                 <input type="radio" name="creativeType" value="imagem">
-                <div class="ctype-box"><b>🖼️ Apenas imagem</b><span>Só prompts de imagem — você personaliza no Atelier/Canva</span></div>
+                <div class="ctype-box"><b>🖼️ Apenas imagem</b><span>Só prompts de imagem — você personaliza no Canva</span></div>
               </label>
             </div>
-            <label class="cstyle-label">Estilo visual dos criativos</label>
+            <label style="display:block;margin:14px 0 8px;font-family:var(--f-mono);font-size:12px;color:var(--muted)">IDENTIDADE VISUAL DOS CRIATIVOS</label>
             <div class="creative-type-pick cstyle-pick">
               <label class="ctype-opt">
                 <input type="radio" name="creativeStyle" value="persona" checked>
-                <div class="ctype-box"><b>👤 Identidade da persona</b><span>Foto realista da persona em cena do nicho</span></div>
+                <div class="ctype-box"><b>👤 Com persona</b><span>Mesmo rosto da página em todos (identidade fixa)</span></div>
               </label>
               <label class="ctype-opt">
                 <input type="radio" name="creativeStyle" value="alt">
-                <div class="ctype-box"><b>🎮 Estilos de alto CTR</b><span>Pixel art, 3D clay, flat... foco no objeto do nicho</span></div>
+                <div class="ctype-box"><b>🎨 Sem persona</b><span>Pixel art, clay 3D, macro... alto CTR no objeto do nicho</span></div>
               </label>
               <label class="ctype-opt">
                 <input type="radio" name="creativeStyle" value="misto">
-                <div class="ctype-box"><b>🧪 Misto (A/B)</b><span>Metade persona, metade estilos alternativos</span></div>
+                <div class="ctype-box"><b>⚡ Misto A/B</b><span>Metade persona, metade estilos alternativos</span></div>
               </label>
             </div>
             <div class="card-grid">
@@ -252,26 +249,27 @@
               </div>
               <div class="sel-card" id="audioCard">
                 <label class="switch-inline"><input type="checkbox" id="wantAudios"><span class="slider"></span> Áudios ElevenLabs v4</label>
+                <small>Tags de emoção livres no idioma + stability por nicho</small>
               </div>
             </div>
           </div>
 
           <div class="toggle-card">
             <label class="switch"><input type="checkbox" id="wantVideos"><span class="slider"></span></label>
-            <div class="toggle-info"><b>🎬 Vídeos — Veo 3.1 (Flow)</b><span>Prompts de vídeo 8s com áudio nativo, prontos pra colar no Google Flow</span></div>
+            <div class="toggle-info"><b>🎬 Vídeos (Veo 3.1 / Flow)</b><span>Prompts Veo 3.1 — clipes de ~8s com áudio nativo, hook em 0-2s</span></div>
           </div>
 
           <div id="videoOpts" class="creative-opts hidden">
             <div class="card-grid">
               <div class="sel-card">
                 <label>Quantidade de vídeos</label>
-                <div class="stepper-ctrl"><button data-dec="numVideos">−</button><input type="number" id="numVideos" value="6" min="1" max="20"><button data-inc="numVideos">+</button></div>
+                <div class="stepper-ctrl"><button data-dec="numVideos">−</button><input type="number" id="numVideos" value="10" min="1" max="20"><button data-inc="numVideos">+</button></div>
               </div>
               <div class="sel-card">
                 <label>Proporção</label>
                 <select id="videoRatio">
-                  <option value="9:16" selected>9:16 (reels/stories)</option>
-                  <option value="16:9">16:9 (feed wide)</option>
+                  <option value="9:16" selected>9:16 vertical (Reels/Stories)</option>
+                  <option value="16:9">16:9 widescreen (feed)</option>
                 </select>
               </div>
             </div>
@@ -279,18 +277,20 @@
 
           <div class="toggle-card">
             <label class="switch"><input type="checkbox" id="wantBroadcasts"><span class="slider"></span></label>
-            <div class="toggle-info"><b>📣 Broadcasts (monetização da base)</b><span>Templates UTILITY no formato de importação do ChatDrink — gera em lotes, tom neutro, títulos aprovados</span></div>
+            <div class="toggle-info"><b>📣 Broadcasts (templates em massa)</b><span>Formato de importação ChatDrink · gerados em lotes de 50 · dedup automático</span></div>
           </div>
 
           <div id="broadcastOpts" class="creative-opts hidden">
             <div class="card-grid">
               <div class="sel-card">
-                <label>Quantidade de templates (mín. 100)</label>
+                <label>Quantidade de templates</label>
                 <div class="stepper-ctrl"><button data-dec="numBroadcasts">−</button><input type="number" id="numBroadcasts" value="250" min="100" max="500" step="50"><button data-inc="numBroadcasts">+</button></div>
+                <small>Mínimo 100 · padrão 250 · máx 500</small>
               </div>
-              <div class="sel-card bimg-card">
-                <label>URL da imagem do header (opcional)</label>
-                <input type="text" id="broadcastImageUrl" placeholder="https://chat.moodlr.digital/static/images/chatbot/...">
+              <div class="sel-card">
+                <label>URL da imagem (opcional)</label>
+                <input type="text" id="broadcastImageUrl" placeholder="https://.../imagem.jpg">
+                <small>Aplicada em todos os templates</small>
               </div>
             </div>
           </div>
@@ -301,7 +301,12 @@
           <div class="step-eyebrow">PASSO 5 / 5</div>
           <h2 class="step-title">O que gerar?</h2>
           <p class="step-help">Marque só o que precisa. Se já tem onboard e sequência prontos, desmarque e gere apenas o resto.</p>
+          <div class="preset-bar" id="presetBar"></div>
           <div class="block-pick" id="blockPick"></div>
+          <div class="toggle-card agent-toggle-card">
+            <label class="switch"><input type="checkbox" id="agentQuality"><span class="slider"></span></label>
+            <div class="toggle-info"><b>🛡 Agente de qualidade</b><span id="agentCostHint">+ até 0 revisões nesta run</span></div>
+          </div>
           <div class="summary" id="summary"></div>
         </div>
       </div>
@@ -341,19 +346,11 @@
           <option value="onboard">Onboard (JSON)</option>
           <option value="sequência">Sequência (JSON)</option>
           <option value="comment">Comentários (JSON)</option>
-          <option value="broadcast">Broadcasts (JSON)</option>
           <option value="grid">Grid MIRB (JSON)</option>
+          <option value="broadcast">Broadcasts (JSON)</option>
           <option value="copy do Meta">Copy do Meta (texto)</option>
           <option value="quiz overlay">Quiz Overlay (texto)</option>
           <option value="outro">Outro</option>
-        </select>
-      </div>
-      <div class="sel-card">
-        <label>Plataforma (se for JSON de chatbot)</label>
-        <select id="optPlatform">
-          <option value="">— não aplicável —</option>
-          <option value="chatdrink">ChatDrink</option>
-          <option value="chatfood">ChatFood</option>
         </select>
       </div>
       <div class="sel-card">
@@ -375,6 +372,31 @@
     </div>
     <button id="optBtn" class="btn-forge">OTIMIZAR 🔧</button>
     <div id="optOutput" class="output"></div>
+
+    <div class="creative-analysis-section">
+      <div class="opt-hero">
+        <h3 class="section-title">Criativos</h3>
+        <p class="step-help">Envie até 6 imagens vencedoras para extrair DNA e gerar variações estruturadas.</p>
+      </div>
+      <div class="card-grid">
+        <div class="sel-card">
+          <label>Imagens</label>
+          <input type="file" id="optCreativeFiles" accept="image/*" multiple>
+          <small>Downscale local: lado maior até 1568px, JPEG q0.85</small>
+        </div>
+        <div class="sel-card">
+          <label>Plataforma-alvo</label>
+          <select id="optCreativePlatform"></select>
+        </div>
+        <div class="sel-card">
+          <label>Variações</label>
+          <input type="number" id="optCreativeVariations" value="8" min="1" max="20">
+        </div>
+      </div>
+      <div id="optCreativeList" class="creative-upload-list"></div>
+      <button id="optCreativeBtn" class="btn-forge">ANALISAR CRIATIVOS 🔎</button>
+      <div id="optCreativeOutput" class="output"></div>
+    </div>
   </section>
 
   <!-- ============ HISTÓRICO ============ -->
@@ -383,7 +405,7 @@
     <div id="historyList" class="history-list"></div>
   </section>
 
-  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v2.0 · <span id="modelFoot"></span></footer>
+  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.0 · <span id="modelFoot"></span></footer>
 </div>
 
 <!-- ===== API KEY MODAL ===== -->
@@ -403,6 +425,6 @@
 <!-- ===== TOAST ===== -->
 <div id="toast" class="toast"></div>
 
-<script src="app.js"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -16,8 +16,9 @@ const $$ = function (s) { return [].slice.call(document.querySelectorAll(s)); };
 const STEP_LABELS = ['Nicho', 'Idioma & Voz', 'Estrutura', 'Criativos', 'Gerar'];
 const FIELD_IDS = ['niche', 'geoCountry', 'campaignLang', 'pageName', 'flowLang', 'contentLang', 'currency',
   'persona', 'modelWizard', 'onboardRoutes', 'onboardRouteType', 'seqRoutes', 'numP1', 'gridCols', 'gridRows',
-  'numCreatives', 'creativePlatform', 'creativeSize', 'numVideos'];
-const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'wantVideos', 'utmNative', 'agentQuality'];
+  'numCreatives', 'creativePlatform', 'creativeSize', 'numVideos', 'videoRatio',
+  'quizFormat', 'numBroadcasts', 'broadcastImageUrl'];
+const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'wantVideos', 'wantBroadcasts', 'utmNative', 'agentQuality'];
 
 let curStep = 1;
 const totalSteps = 5;
@@ -36,6 +37,7 @@ export function initWizard() {
   gridUpd();
   updateCreativeUI();
   updateVideoUI();
+  updateBroadcastUI();
   syncBlockToggles();
   updateSummary();
   gotoStep(1);
@@ -59,11 +61,12 @@ function wireWizard() {
   $('#wizNext').onclick = function () { if (!validateStep(curStep)) return; if (curStep < totalSteps) gotoStep(curStep + 1); };
   $('#wizPrev').onclick = function () { if (curStep > 1) gotoStep(curStep - 1); };
 
+  // steppers respeitam o atributo step (ex.: broadcasts de 50 em 50)
   $$('[data-inc]').forEach(function (b) {
-    b.onclick = function () { const t = $('#' + b.getAttribute('data-inc')); t.value = Math.min(+t.max || 999, (+t.value || 0) + 1); t.dispatchEvent(new Event('input', { bubbles: true })); };
+    b.onclick = function () { const t = $('#' + b.getAttribute('data-inc')); const st = +t.step || 1; t.value = Math.min(+t.max || 999, (+t.value || 0) + st); t.dispatchEvent(new Event('input', { bubbles: true })); };
   });
   $$('[data-dec]').forEach(function (b) {
-    b.onclick = function () { const t = $('#' + b.getAttribute('data-dec')); t.value = Math.max(+t.min || 0, (+t.value || 0) - 1); t.dispatchEvent(new Event('input', { bubbles: true })); };
+    b.onclick = function () { const t = $('#' + b.getAttribute('data-dec')); const st = +t.step || 1; t.value = Math.max(+t.min || 0, (+t.value || 0) - st); t.dispatchEvent(new Event('input', { bubbles: true })); };
   });
 
   $('#gridCols').oninput = gridUpd;
@@ -75,9 +78,11 @@ function wireWizard() {
 
   $('#wantCreatives').onchange = function () { updateCreativeUI(); syncBlockToggles(); };
   $$('input[name=creativeType]').forEach(function (r) { r.onchange = function () { updateCreativeUI(); syncBlockToggles(); }; });
+  $$('input[name=creativeStyle]').forEach(function (r) { r.onchange = function () { scheduleDraft(); }; });
   $('#imagePrompts').onchange = syncBlockToggles;
   $('#wantAudios').onchange = syncBlockToggles;
   $('#wantVideos').onchange = function () { updateVideoUI(); syncBlockToggles(); };
+  $('#wantBroadcasts').onchange = function () { updateBroadcastUI(); syncBlockToggles(); };
   $('#agentQuality').onchange = function () { updateSummary(); scheduleDraft(); };
 
   // auto-save do rascunho: qualquer input/change no wizard
@@ -97,6 +102,11 @@ function updateCreativeUI() {
 function updateVideoUI() {
   const opts = $('#videoOpts');
   if (opts) opts.classList.toggle('hidden', !$('#wantVideos').checked);
+}
+// v4: broadcasts em massa — mesmo padrão.
+function updateBroadcastUI() {
+  const opts = $('#broadcastOpts');
+  if (opts) opts.classList.toggle('hidden', !$('#wantBroadcasts').checked);
 }
 
 function gridUpd() {
@@ -161,6 +171,7 @@ export function syncBlockToggles() {
   setBlk('creatives_prompt', $('#wantCreatives').checked);
   setBlk('audios', $('#wantAudios').checked);
   setBlk('video_prompts', $('#wantVideos').checked);
+  setBlk('broadcast', $('#wantBroadcasts').checked);
   updateSummary();
   scheduleDraft();
 }
@@ -175,9 +186,14 @@ export function updateSummary() {
   const hint = $('#agentCostHint');
   if (hint) hint.textContent = '+ até ' + (ag && ag.checked ? reviewable : 0) + ' revisões nesta run';
   const s = $('#summary'); if (!s) return;
+  const qf = $('#quizFormat') && $('#quizFormat').value === 'offerwall' ? 'offerwalls' : 'quizzes';
+  const wantB = $('#wantBroadcasts') && $('#wantBroadcasts').checked;
+  const nB = wantB ? (+($('#numBroadcasts') || {}).value || 250) : 0;
   s.innerHTML = 'Vou gerar <b>' + esc($('#niche').value || '(nicho)') + '</b> com <b>' + esc($('#seqRoutes').value) +
     '</b> sequência(s) completas, <b>' + esc($('#numP1').value) + '</b> P1 (+ ' + esc($('#numP1').value) +
-    ' quizzes), grid <b>' + c + '×' + r + '</b> = <b>' + (c * r) + '</b> P2s.<br>Blocos: <b>' + blocks.length + '</b> selecionados.' +
+    ' ' + qf + '), grid <b>' + c + '×' + r + '</b> = <b>' + (c * r) + '</b> P2s' +
+    (nB ? ', <b>' + nB + '</b> broadcasts (lotes de 50)' : '') +
+    '.<br>Blocos: <b>' + blocks.length + '</b> selecionados.' +
     (ag && ag.checked ? '<br><span class="agent-cost-line">🛡 Agente ligado: + até ' + reviewable + ' revisões nesta run.</span>' : '');
 }
 
@@ -193,7 +209,12 @@ export function collectParams() {
     gridCols: +$('#gridCols').value, gridRows: +$('#gridRows').value,
     numCreatives: +$('#numCreatives').value, creativePlatform: $('#creativePlatform').value, creativeSize: $('#creativeSize').value,
     creativeType: (document.querySelector('input[name=creativeType]:checked') || {}).value || 'completo',
+    creativeStyle: (document.querySelector('input[name=creativeStyle]:checked') || {}).value || 'persona',
     numVideos: +$('#numVideos').value,
+    videoRatio: $('#videoRatio') ? $('#videoRatio').value : '9:16',
+    quizFormat: $('#quizFormat') ? $('#quizFormat').value : 'offerwall',
+    numBroadcasts: Math.max(100, Math.min(500, +($('#numBroadcasts') ? $('#numBroadcasts').value : 250) || 250)),
+    broadcastImageUrl: $('#broadcastImageUrl') ? $('#broadcastImageUrl').value.trim() : '',
     imagePrompts: $('#imagePrompts').checked,
     utmNative: $('#utmNative').checked
   };
@@ -202,7 +223,12 @@ export function collectParams() {
 
 /* ---------- snapshot / restore (rascunho + presets) ---------- */
 export function snapshotWizard() {
-  const snap = { fields: {}, checks: {}, creativeType: (document.querySelector('input[name=creativeType]:checked') || {}).value || 'completo', blocks: selectedBlocks() };
+  const snap = {
+    fields: {}, checks: {},
+    creativeType: (document.querySelector('input[name=creativeType]:checked') || {}).value || 'completo',
+    creativeStyle: (document.querySelector('input[name=creativeStyle]:checked') || {}).value || 'persona',
+    blocks: selectedBlocks()
+  };
   FIELD_IDS.forEach(function (id) { const el = $('#' + id); if (el) snap.fields[id] = el.value; });
   CHECK_IDS.forEach(function (id) { const el = $('#' + id); if (el) snap.checks[id] = el.checked; });
   return snap;
@@ -217,10 +243,11 @@ export function restoreWizard(snap) {
   });
   if (snap.checks) CHECK_IDS.forEach(function (id) { const el = $('#' + id); if (el && snap.checks[id] != null) el.checked = snap.checks[id]; });
   if (snap.creativeType) { const r = document.querySelector('input[name=creativeType][value="' + snap.creativeType + '"]'); if (r) r.checked = true; }
+  if (snap.creativeStyle) { const r = document.querySelector('input[name=creativeStyle][value="' + snap.creativeStyle + '"]'); if (r) r.checked = true; }
   if (Array.isArray(snap.blocks)) {
     $$('.blk').forEach(function (d) { d.classList.toggle('on', snap.blocks.indexOf(d.dataset.block) >= 0); });
   }
-  gridUpd(); updateCreativeUI(); updateVideoUI(); syncBlockToggles(); updateSummary();
+  gridUpd(); updateCreativeUI(); updateVideoUI(); updateBroadcastUI(); syncBlockToggles(); updateSummary();
 }
 function scheduleDraft() { saveDraft(snapshotWizard()); }
 export function resetDraft() { clearDraft(); }

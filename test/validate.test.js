@@ -146,3 +146,11 @@ test('validateChatDrink — json ausente retorna ok:true sem erros', () => {
   assert.equal(ok, true);
   assert.deepEqual(errors, []);
 });
+
+test('validateChatDrink(broadcast) — avisa URL fora do padrão e emoji no body', () => {
+  const { validateChatDrink } = require('../lib/validate');
+  const ok = validateChatDrink('broadcast', [{ name: 'a', body_text: '{{first_name}} x.', buttons: [{ url: '{{URL_REDIR}}?utm_source=broadutility&utm_campaign={{CAMPAIGN_BROAD}}&utm_medium={{NOMEDAPAGINA}}' }] }]);
+  assert.ok(ok.ok);
+  const bad = validateChatDrink('broadcast', [{ name: 'a', body_text: 'oi 🎉', buttons: [{ url: 'https://x' }] }]);
+  assert.ok(!bad.ok && bad.errors.length === 2);
+});

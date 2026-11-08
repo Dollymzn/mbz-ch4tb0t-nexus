@@ -150,7 +150,7 @@ test('buildBlockPrompt(video_prompts) — contém beats(hook_0_2s), 9:16, "no su
   assert.ok(prompt.includes('cta_6_8s'));
   assert.ok(prompt.includes('9:16'));
   assert.ok(prompt.includes('no subtitles'));
-  assert.ok(prompt.includes(', vertical 9:16 composition, no subtitles, no captions, no watermark'));
+  assert.ok(prompt.includes(', 9:16 vertical composition, 8 seconds, cinematic quality, no on-screen text, no subtitles, no captions, no watermark'));
   // idioma da campanha (não o do blog)
   assert.ok(prompt.includes('pt-BR'));
   // consome creativesContext e audiosContext
