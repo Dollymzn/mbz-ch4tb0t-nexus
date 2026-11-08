@@ -98,3 +98,9 @@ Base: arquitetura v3.2b (SSE + orquestrador topológico + NEXUS Agent + identida
 - Otimizador com kind `broadcast` passa pelo `fixBroadcasts`.
 - `validateChatDrink('broadcast')`: warnings de URL fora do padrão, emoji no body, sem name.
 - 151 testes.
+
+## 11. v4.0.2 — prompts "Flow-safe"
+- Novo bloco `FLOW_SAFE` injetado em fb_images, persona_identity, image_prompts, creatives_prompt, video_prompts e grid (image_prompt): só descrever o que aparece (sem listas "no tattoos/no celebrity/never change"), sem nacionalidade/país/bandeira (traços e cenário descritos visualmente), sem cartão/dinheiro/documentos (categoria bloqueada no Imagen), adultos por faixa etária, sem marcas/celebridades, sensualidade só por luz/pose/olhar.
+- `persona_identity.core` proibido de conter rótulo étnico/nacional; `avoid` vira nota interna (personaIdentityLine não injeta mais "NUNCA altere" como texto de prompt).
+- Capa do FB evoca a região por paisagem/luz/arquitetura, nunca por nome do país ou bandeira.
+- Motivo: prompt de perfil da persona (nicho crédito) rejeitado pelo Google Flow — cartão de crédito + lista de negativos + "Brazilian woman / hint at Brazil".

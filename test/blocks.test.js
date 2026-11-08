@@ -149,3 +149,13 @@ test('buildBlockPrompt — fb_images: nicho manda sobre persona mística e post 
   assert.ok(/convite EXPLICITO pra COMENTAR/i.test(prompt));
   assert.ok(prompt.includes('10 a 16 linhas'));
 });
+
+test('v4.0.2 — prompts de imagem/vídeo carregam as regras de segurança do Flow (sem país/cartão/negativos sensíveis)', () => {
+  const p = { niche: 'Cartão de Crédito', pageName: 'Harper', geoCountry: 'Brasil', numCreatives: 3, creativePlatform: 'google_flow', creativeType: 'completo', numVideos: 2, gridCols: 2, gridRows: 2 };
+  ['fb_images', 'persona_identity', 'image_prompts', 'creatives_prompt', 'video_prompts'].forEach(b => {
+    assert.ok(buildBlockPrompt(b, p).includes('SEGURANÇA DO PROMPT'), b + ' sem FLOW_SAFE');
+  });
+  const fb = buildBlockPrompt('fb_images', p);
+  assert.ok(!fb.includes('bandeira sutil'), 'capa não pede bandeira do país');
+  assert.ok(buildBlockPrompt('persona_identity', p).includes('PROIBIDO escrever nacionalidade'));
+});
