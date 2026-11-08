@@ -13,6 +13,7 @@ var $=function(s){return document.querySelector(s)}, $$=function(s){return [].sl
 // blocks meta: kind = 'json-download' (baixa .json) | 'text' (sanitiza pra leitura)
 var BLOCKS=[
   {id:'page_name',name:'Nome de Página',hint:'sugestão FB',kind:'text',def:true},
+  {id:'persona_identity',name:'Identidade da Persona',hint:'character sheet',kind:'text',def:true},
   {id:'fb_images',name:'Página FB Completa',hint:'fotos + bio + post',kind:'text',def:false},
   {id:'onboard',name:'Onboard',hint:'JSON chatbot',kind:'json-download',def:true},
   {id:'sequence',name:'Sequência',hint:'JSON chatbot',kind:'json-download',def:true},
@@ -26,6 +27,7 @@ var BLOCKS=[
   {id:'image_prompts',name:'Prompts de Imagem',hint:'fluxo',kind:'text',def:false,needsToggle:'imagePrompts'},
   {id:'creatives_prompt',name:'Criativos',hint:'prompts',kind:'text',def:false,needsToggle:'wantCreatives'},
   {id:'audios',name:'Áudios v4',hint:'ElevenLabs',kind:'text',def:false,needsToggle:'wantAudios'},
+  {id:'video_prompts',name:'Vídeos Veo 3.1',hint:'prompts Flow',kind:'text',def:false,needsToggle:'wantVideos'},
   {id:'broadcast',name:'Broadcasts',hint:'monetização da base',kind:'json-download',def:false,needsToggle:'wantBroadcasts'}
 ];
 var BLABEL={}; BLOCKS.forEach(function(b){BLABEL[b.id]=b.name});
@@ -153,6 +155,7 @@ function wireWizard(){
   $('#imagePrompts').onchange=syncBlockToggles;
   $('#wantAudios').onchange=syncBlockToggles;
   $('#wantBroadcasts').onchange=function(){$('#broadcastOpts').classList.toggle('hidden',!this.checked);syncBlockToggles()};
+  $('#wantVideos').onchange=function(){$('#videoOpts').classList.toggle('hidden',!this.checked);syncBlockToggles()};
 }
 function drawGridPreview(c,r){
   var el=$('#gridPreview');el.style.gridTemplateColumns='repeat('+c+',1fr)';el.innerHTML='';
@@ -190,6 +193,7 @@ function syncBlockToggles(){
   setBlk('image_prompts',$('#imagePrompts').checked);
   setBlk('creatives_prompt',$('#wantCreatives').checked);
   setBlk('audios',$('#wantAudios').checked);
+  setBlk('video_prompts',$('#wantVideos').checked);
   setBlk('broadcast',$('#wantBroadcasts').checked);
   updateSummary();
 }
@@ -268,8 +272,10 @@ function collectParams(){
     numCreatives:+$('#numCreatives').value,creativePlatform:$('#creativePlatform').value,creativeSize:$('#creativeSize').value,
     creativeType:(document.querySelector('input[name=creativeType]:checked')||{}).value||'completo',
     creativeStyle:(document.querySelector('input[name=creativeStyle]:checked')||{}).value||'persona',
-    numBroadcasts:+(($('#numBroadcasts')||{}).value||10),
+    numBroadcasts:+(($('#numBroadcasts')||{}).value||250),
     broadcastImageUrl:(($('#broadcastImageUrl')||{}).value||'').trim(),
+    numVideos:+(($('#numVideos')||{}).value||6),
+    videoRatio:(($('#videoRatio')||{}).value||'9:16'),
     imagePrompts:$('#imagePrompts').checked
   };
   return lastParams;
@@ -281,7 +287,7 @@ function runForge(){
   if(!lastParams.niche){toast('Digite o nicho.');gotoStep(1);return}
   if(!CFG.serverKey&&!USER_KEY){$('#keyModal').classList.remove('hidden');return}
   var blocks=selectedBlocks();if(!blocks.length){toast('Marque ao menos um bloco.');return}
-  var out=$('#output');out.innerHTML='';lastBlocks={};delete lastParams.gridDirection;delete lastParams.onboardMenuCount;delete lastParams.seqMenuCount;delete lastParams.onboardMenuMap;delete lastParams.seqMenuMap;delete lastParams.creativesContext;
+  var out=$('#output');out.innerHTML='';lastBlocks={};delete lastParams.gridDirection;delete lastParams.onboardMenuCount;delete lastParams.seqMenuCount;delete lastParams.onboardMenuMap;delete lastParams.seqMenuMap;delete lastParams.creativesContext;delete lastParams.personaIdentity;delete lastParams.personaSheet;
   $('#wizForge').disabled=true;$('#classicForge').disabled=true;$('#outputActions').classList.add('hidden');
   blocks.forEach(function(b){out.appendChild(makeCard(b))});
   out.scrollIntoView({behavior:'smooth',block:'start'});
@@ -304,6 +310,8 @@ function runForge(){
 }
 
 function genBlock(b,done){
+  // broadcasts grandes (>60) são gerados em lotes de 50 pra não estourar timeout
+  if(b==='broadcast'&&(+lastParams.numBroadcasts||0)>60){genBroadcastBatches(done);return}
   fetch('/api/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({block:b,params:lastParams,model:MODEL})})
   .then(function(r){return r.json()}).then(function(res){
     if(res.error){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(res.error)+'</pre>')}
@@ -314,9 +322,55 @@ function genBlock(b,done){
       if(b==='sequence'&&res.json){var sm=menuBreakdown(res.json);lastParams.seqMenuCount=sm.total;lastParams.seqMenuMap=sm.map}
       // captura contexto dos criativos pra casar com os audios
       if(b==='creatives_prompt'&&res.json)lastParams.creativesContext=creativesSummary(res.json);
+      // captura a identidade canonica da persona pra alimentar fb_images/criativos/cards/videos
+      if(b==='persona_identity'&&res.json){lastParams.personaIdentity=res.json.base_prompt_en||'';lastParams.personaSheet=res.json}
     }
     done();
   }).catch(function(err){setStatus(b,'error');setBody(b,'<pre>ERRO: '+esc(err.message)+'</pre>');done()});
+}
+
+// gera broadcasts em lotes de 50 (250 templates = 5 lotes), mostrando progresso
+function genBroadcastBatches(done){
+  var total=+lastParams.numBroadcasts||250;
+  var size=50,batches=Math.ceil(total/size),all=[],bi=0;
+  function prog(txt){var e=$('#st-broadcast');if(e){e.className='block-status loading';e.innerHTML='<span class="spinner"></span> '+txt}}
+  function next(){
+    if(bi>=batches||all.length>=total){
+      var merged=mergeBroadcasts(all.slice(0,total));
+      var res={raw:JSON.stringify(merged,null,2),json:merged};
+      lastBlocks['broadcast']=res;setStatus('broadcast','done');renderBlock('broadcast',res);
+      var st=$('#st-broadcast');if(st)st.innerHTML='✓ '+merged.length+' templates';
+      done();return;
+    }
+    bi++;prog('lote '+bi+'/'+batches+' ('+all.length+'/'+total+')');
+    var count=Math.min(size,total-all.length);
+    var params=Object.assign({},lastParams,{numBroadcasts:count,batchIndex:bi,batchTotal:batches});
+    fetch('/api/generate',{method:'POST',headers:authHeaders(),body:JSON.stringify({block:'broadcast',params:params,model:MODEL})})
+    .then(function(r){return r.json()}).then(function(res){
+      if(res.error){setStatus('broadcast','error');setBody('broadcast','<pre>ERRO no lote '+bi+'/'+batches+': '+esc(res.error)+(all.length?'\n\n('+all.length+' templates dos lotes anteriores foram preservados abaixo)\n\n'+esc(JSON.stringify(mergeBroadcasts(all),null,2)):'')+'</pre>');done();return}
+      var arr=res.json||safeParse(res.raw)||[];
+      if(Array.isArray(arr))all=all.concat(arr);
+      next();
+    }).catch(function(err){setStatus('broadcast','error');setBody('broadcast','<pre>ERRO: '+esc(err.message)+'</pre>');done()});
+  }
+  next();
+}
+
+// junta lotes garantindo names e bodies 100% únicos no conjunto final
+function mergeBroadcasts(all){
+  var names={},bodies={},out=[];
+  var alts=['Open it to continue.','Tap to view it now.','Check it now.','View it to proceed.','You can open it now.','Open it before it expires.','Review it now.','Access it now.','Open it today.','View it before it closes.'];
+  all.forEach(function(b,i){
+    if(!b||typeof b!=='object')return;
+    var name=b.name||('broadcast_'+(i+1));var k=2;
+    while(names[name]){name=(b.name||'broadcast')+'_'+k;k++}
+    names[name]=1;b.name=name;
+    var body=b.body_text||'';var ai=0;
+    while(bodies[body]&&ai<alts.length){body=(b.body_text||'').replace(/\n\n[\s\S]*$/,'')+'\n\n'+alts[ai];ai++}
+    bodies[body]=1;b.body_text=body;
+    out.push(b);
+  });
+  return out;
 }
 function countMenus(flow){
   var n=0;
@@ -469,6 +523,25 @@ function sanitize(b,j,raw){
   if(!j)return '<pre>'+esc(raw||'')+'</pre>';
   try{
     if(b==='page_name'&&j.names) return list(j.names);
+    if(b==='persona_identity'&&j.base_prompt_en){
+      window._ipStore=window._ipStore||{};window._ipStore['pid_base']=j.base_prompt_en;
+      var h='<span class="tag">🧬 '+esc(j.name||'')+'</span>';
+      if(j.look)h+='<h4 style="margin-top:8px">Aparência</h4><p>'+esc(j.look)+'</p>';
+      if(j.style)h+='<h4>Estilo</h4><p>'+esc(j.style)+'</p>';
+      if(j.setting)h+='<h4>Cenário canônico</h4><p>'+esc(j.setting)+'</p>';
+      if(j.palette)h+='<p style="margin:8px 0">'+j.palette.map(function(c){return '<span style="display:inline-block;width:22px;height:22px;border-radius:5px;background:'+esc(c)+';margin-right:6px;vertical-align:middle;border:1px solid rgba(255,255,255,.2)"></span>'}).join('')+'</p>';
+      h+='<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>🎯 Prompt base (EN) — cola em qualquer gerador</b><button class="mini-btn ipcopy" data-ip="pid_base">copiar</button></div><p>'+esc(j.base_prompt_en)+'</p></div>';
+      h+='<p style="color:var(--green);font-size:12px;margin-top:6px">✓ Esta identidade será usada automaticamente nas fotos da página, criativos com persona, cards e vídeos</p>';
+      setTimeout(bindIpCopy,0);
+      return h;
+    }
+    if(b==='video_prompts'&&j.videos){
+      var vvi=0;window._ipStore=window._ipStore||{};
+      return '<span class="tag">VEO 3.1 · Flow · '+esc((lastParams.videoRatio||'9:16'))+' · 8s</span>'+j.videos.map(function(v){
+        var id='vp_'+(vvi++);window._ipStore[id]=v.prompt||'';
+        return '<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>#'+(v.index||'')+(v.style?' · '+esc(v.style):'')+'</b><button class="mini-btn ipcopy" data-ip="'+id+'">copiar</button></div>'+(v.hook?'<p style="font-size:12px;color:var(--pink);margin:4px 0 2px">⚡ hook 0-2s: '+esc(v.hook)+'</p>':'')+'<p>'+esc(v.prompt||'')+'</p></div>';
+      }).join('')+(setTimeout(bindIpCopy,0),'');
+    }
     if(b==='fb_images'){
       var h='';
       if(j.profile)h+='<h4>📷 Foto de Perfil (1:1)</h4><div class="kv"><p>'+esc(j.profile.prompt||j.profile)+'</p></div>';
@@ -590,6 +663,8 @@ function cleanText(b,j,raw){
   if(!j)return raw||'';
   try{
     if(b==='page_name'&&j.names)return j.names.join('\n');
+    if(b==='persona_identity'&&j.base_prompt_en)return 'IDENTIDADE: '+(j.name||'')+'\n\nAPARÊNCIA:\n'+(j.look||'')+'\n\nESTILO:\n'+(j.style||'')+'\n\nCENÁRIO:\n'+(j.setting||'')+'\n\nPALETA: '+((j.palette||[]).join(' '))+'\n\nPROMPT BASE (EN):\n'+j.base_prompt_en;
+    if(b==='video_prompts'&&j.videos)return j.videos.map(function(v){return '#'+(v.index||'')+' ['+(v.style||'')+']'+(v.hook?'\nhook: '+v.hook:'')+'\n'+(v.prompt||'')}).join('\n\n');
     if(b==='fb_images')return 'FOTO DE PERFIL:\n'+((j.profile&&(j.profile.prompt||j.profile))||'')+'\n\nFOTO DE CAPA:\n'+((j.cover&&(j.cover.prompt||j.cover))||'')+(j.bio?'\n\nBIO:\n'+j.bio:'')+(j.intro_post?'\n\nPOST DE APRESENTAÇÃO:\n'+j.intro_post:'');
     if((b==='p1_titles'||b==='p2_titles')&&j.titles)return j.titles.map(function(t,i){return (i+1)+'. '+t}).join('\n');
     if(b==='meta_copy')return 'TEXTOS:\n'+(j.primary_texts||[]).map(function(t,i){return (i+1)+'. '+t}).join('\n\n')+'\n\nTÍTULOS:\n'+(j.headlines||[]).join('\n')+'\n\nDESCRIÇÃO:\n'+(j.description||'');

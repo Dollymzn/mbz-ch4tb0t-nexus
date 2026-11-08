@@ -257,15 +257,36 @@
           </div>
 
           <div class="toggle-card">
+            <label class="switch"><input type="checkbox" id="wantVideos"><span class="slider"></span></label>
+            <div class="toggle-info"><b>🎬 Vídeos — Veo 3.1 (Flow)</b><span>Prompts de vídeo 8s com áudio nativo, prontos pra colar no Google Flow</span></div>
+          </div>
+
+          <div id="videoOpts" class="creative-opts hidden">
+            <div class="card-grid">
+              <div class="sel-card">
+                <label>Quantidade de vídeos</label>
+                <div class="stepper-ctrl"><button data-dec="numVideos">−</button><input type="number" id="numVideos" value="6" min="1" max="20"><button data-inc="numVideos">+</button></div>
+              </div>
+              <div class="sel-card">
+                <label>Proporção</label>
+                <select id="videoRatio">
+                  <option value="9:16" selected>9:16 (reels/stories)</option>
+                  <option value="16:9">16:9 (feed wide)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="toggle-card">
             <label class="switch"><input type="checkbox" id="wantBroadcasts"><span class="slider"></span></label>
-            <div class="toggle-info"><b>📣 Broadcasts (monetização da base)</b><span>Templates UTILITY no formato de importação do ChatDrink — tom neutro, títulos aprovados</span></div>
+            <div class="toggle-info"><b>📣 Broadcasts (monetização da base)</b><span>Templates UTILITY no formato de importação do ChatDrink — gera em lotes, tom neutro, títulos aprovados</span></div>
           </div>
 
           <div id="broadcastOpts" class="creative-opts hidden">
             <div class="card-grid">
               <div class="sel-card">
-                <label>Quantidade de templates</label>
-                <div class="stepper-ctrl"><button data-dec="numBroadcasts">−</button><input type="number" id="numBroadcasts" value="10" min="1" max="100"><button data-inc="numBroadcasts">+</button></div>
+                <label>Quantidade de templates (mín. 100)</label>
+                <div class="stepper-ctrl"><button data-dec="numBroadcasts">−</button><input type="number" id="numBroadcasts" value="250" min="100" max="500" step="50"><button data-inc="numBroadcasts">+</button></div>
               </div>
               <div class="sel-card bimg-card">
                 <label>URL da imagem do header (opcional)</label>

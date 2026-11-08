@@ -461,7 +461,7 @@ app.post('/api/generate', async (req, res) => {
 
     const system = buildSystemPrompt();
     const userMsg = buildBlockPrompt(block, params);
-    const heavy = ['onboard', 'sequence', 'creatives_prompt', 'audios', 'quiz', 'broadcast'].includes(block);
+    const heavy = ['onboard', 'sequence', 'creatives_prompt', 'audios', 'quiz', 'broadcast', 'video_prompts'].includes(block);
     const text = await callClaude(apiKey, model, system, userMsg, heavy ? 20000 : 7000);
 
     const json = extractJSON(text);
@@ -552,6 +552,7 @@ SLUG: ${nslug}`;
       return `${ctx}
 Gere 2 prompts de imagem (em INGLES, muito detalhados) para a pagina de Facebook da persona "${p.pageName || 'a persona'}" do nicho "${p.niche}"${p.geoCountry ? ', pais-alvo ' + p.geoCountry : ''}${p.campaignLang ? ', idioma ' + p.campaignLang : ''}.
 A persona deve ser uma PESSOA REAL coerente com o nome, etnia e cultura do pais-alvo, e o estilo visual deve combinar com o nicho.
+${p.personaIdentity ? 'IDENTIDADE CANONICA DA PERSONA (use EXATAMENTE esta aparencia nas duas imagens, sem alterar nenhum traco): ' + p.personaIdentity : ''}
 
 1) FOTO DE PERFIL (profile): retrato quadrado 1:1, rosto/busto da persona em destaque, expressao acolhedora e magnetica, iluminacao cinematografica quente, leve profundidade de campo, elementos do nicho e do pais sutis ao fundo, cores ricas, qualidade editorial premium. Termine com ", 1:1 square portrait, professional photography, ultra detailed".
 
@@ -592,12 +593,62 @@ Estrutura EXATA:
 Idioma ${p.flowLang || 'en-US'}. O reply_public_text e a resposta PUBLICA automatica no comentario (ex: "Just sent you a DM! 💕 Check your inbox ✨").
 Responda APENAS o JSON valido nesse formato exato.`;
 
+    case 'persona_identity':
+      return `${ctx}
+Crie a IDENTIDADE VISUAL CANONICA (character sheet) da persona "${p.pageName || 'a persona da pagina'}" pro nicho "${p.niche}"${p.geoCountry ? ', pais-alvo ' + p.geoCountry : ''}.
+A MESMA aparencia sera usada em TODAS as pecas do funil (foto de perfil, capa, criativos, cards, videos) pra consistencia total de identidade.
+A aparencia deve ser coerente com o nome e os tracos tipicos do pais-alvo, com idade e estetica coerentes com o nicho e com a persona ${p.personaLabel}.
+Campos:
+- look: descricao fisica completa em PT (idade aparente, tracos/etnia, cabelo cor+corte+textura, olhos, pele, tracos marcantes).
+- style: vestuario/estetica recorrente (pecas, cores, acessorios caracteristicos dela).
+- setting: cenario canonico (ambiente, objetos do nicho, iluminacao).
+- palette: 3-4 cores hex da identidade visual.
+- base_prompt_en: UM paragrafo em INGLES descrevendo a personagem com precisao fotografica, reutilizavel em QUALQUER gerador (DALL-E, Flow/Veo, Flux, Frame IA) — tracos fisicos especificos, roupa, mood, iluminacao. NAO cite pais/nacionalidade por nome (descreva os tracos, nao a origem).
+Responda JSON: {"name":"${p.pageName || ''}","look":"...","style":"...","setting":"...","palette":["#hex","#hex","#hex"],"base_prompt_en":"..."}`;
+
+    case 'video_prompts': {
+      const nv = p.numVideos || 6;
+      const ratio = p.videoRatio || '9:16';
+      const orient = ratio === '9:16' ? 'vertical' : 'widescreen';
+      const vstyle = p.creativeStyle || 'persona';
+      const V_ALT = 'pixel art animado, 3D clay stop-motion, macro cinematografico do objeto, anime retro, papercraft animado, neon glow dark';
+      const vStyleLine = vstyle === 'persona'
+        ? 'Todos os videos com a PERSONA como protagonista.' + (p.personaIdentity ? ' IDENTIDADE CANONICA (mesma aparencia em TODOS os videos): ' + p.personaIdentity : '')
+        : vstyle === 'alt'
+          ? 'SEM persona: cada video num estilo visual alternativo de alto CTR focado no OBJETO/simbolo do nicho (varie entre: ' + V_ALT + '). Declare o estilo no campo "style".'
+          : 'Misto A/B: metade dos videos com a persona' + (p.personaIdentity ? ' (identidade canonica: ' + p.personaIdentity + ')' : '') + ', metade em estilos alternativos focados no objeto do nicho (varie entre: ' + V_ALT + ').';
+      return `${ctx}
+Gere EXATAMENTE ${nv} prompts de VIDEO de 8 segundos pro VEO 3.1 (Google Flow), proporcao ${ratio} ${orient}, pro nicho "${p.niche}".
+${vStyleLine}
+ESTRUTURA DE CADA PROMPT (em INGLES, 1 paragrafo denso no padrao Veo): [sujeito + acao continua] + [movimento de camera: slow push-in / orbit / handheld / dolly / crash zoom] + [iluminacao e atmosfera] + [estilo visual] + [AUDIO nativo do Veo: sons de ambiente descritos + opcionalmente UMA fala curta entre aspas no idioma ${p.flowLang || 'en-US'}].
+REGRAS:
+- HOOK nos primeiros 2 segundos: um movimento, revelacao ou gesto que PARA o scroll.
+- NO ON-SCREEN TEXT: o Veo renderiza texto mal — o texto e adicionado depois no Atelier/Frame IA. Inclua "no on-screen text" em todo prompt.
+- NUNCA cite pais, cidade ou regiao (roda multi-GEO).
+- Pegada sensual/secreta/misteriosa quando o nicho permitir — e o que da ROI.
+- Termine cada prompt com ", ${ratio} ${orient}, 8 seconds, cinematic quality, no on-screen text".
+Responda JSON: {"videos":[{"index":1,"style":"<estilo>","hook":"<o que acontece nos 2s iniciais, em PT>","prompt":"<prompt completo em ingles com audio>"}]} com EXATAMENTE ${nv} itens.`;
+    }
+
     case 'broadcast': {
-      const nb = p.numBroadcasts || 10;
+      const nb = p.numBroadcasts || 100;
       const blang = (p.flowLang || 'en-US').replace('-', '_');
       const bimg = p.broadcastImageUrl || '';
+      // pools estruturais por lote: garantem unicidade entre lotes de uma geracao grande (250+)
+      const POOLS = [
+        { subj: 'message / letter', verbs: 'has been registered / has been delivered / has been saved / has been recorded', close: 'Open it to continue. / Open it to proceed. / Open it now.' },
+        { subj: 'note / update', verbs: 'is now available / is now ready / has been added / has been logged', close: 'Tap to view it now. / View it now. / Check it now.' },
+        { subj: 'message / record', verbs: 'is now waiting / has been placed / has been prepared / has been filed', close: 'You can open it now. / Review it now. / Open it before it expires.' },
+        { subj: 'letter / notice', verbs: 'has been issued / has been stored / is now active / has been posted', close: 'Access it now. / View it to continue. / Tap to open it.' },
+        { subj: 'note / message', verbs: 'has been assigned / is now pending / has been confirmed / has been released', close: 'Check it to proceed. / Open it today. / View it before it closes.' }
+      ];
+      const bi = Math.max(1, +p.batchIndex || 1);
+      const pool = POOLS[(bi - 1) % POOLS.length];
+      const batchLine = p.batchIndex
+        ? `\nESTE E O LOTE ${bi}${p.batchTotal ? ' de ' + p.batchTotal : ''} de uma geracao maior — pra NAO repetir os outros lotes, use SOMENTE esta base estrutural (traduzida pro idioma ${blang}): substantivos [${pool.subj}], verbos [${pool.verbs}], fechamentos [${pool.close}]. Varie artigos, ordem e combinacoes dentro desse pool. Todos os names com o sufixo de serie "_b${bi}_<n>" (ex: slug_b${bi}_1, slug_b${bi}_2...).`
+        : '';
       return `${ctx}
-Gere EXATAMENTE ${nb} templates de BROADCAST (formato de importacao ChatDrink jul/2026) pro nicho "${p.niche}", idioma ${blang}, categoria UTILITY.
+Gere EXATAMENTE ${nb} templates de BROADCAST (formato de importacao ChatDrink jul/2026) pro nicho "${p.niche}", idioma ${blang}, categoria UTILITY.${batchLine}
 REGRAS CRITICAS (seguir = ~90% de aprovacao na Meta; violar = rejeicao em massa):
 - body_text: tom NEUTRO OPERACIONAL, estilo notificacao de sistema (ex: "A message has been registered on your account."). NUNCA tom tematico, mistico ou emocional ("a mysterious message awaits you" = REJEITADO EM MASSA, comprovado).
 - body_text SEM NENHUM EMOJI (quebra o charset do banco).
@@ -762,7 +813,7 @@ Responda JSON: {"quizzes":[ ...${p.numP1} overlays... ]}`;
       const seqMenus = p.seqMenuCount != null ? p.seqMenuCount : (p.seqRoutes || 3) * 7;
       const themeLine = p.fromOptimizer
         ? `IMPORTANTE: baseie os prompts EXCLUSIVAMENTE no conteudo/tema do fluxo abaixo (ignore qualquer outro nicho). Conteudo real do fluxo enviado: "${p.niche}". As imagens devem refletir ESTE tema, nada alem disso.`
-        : `Tema/nicho: "${p.niche}".`;
+        : `Tema/nicho: "${p.niche}".${p.personaIdentity ? ' Quando um card mostrar uma PESSOA, use EXATAMENTE esta identidade canonica da persona: ' + p.personaIdentity : ''}`;
       // monta o esqueleto EXATO esperado a partir do mapa real de menus por rota
       let seqSkeleton = '';
       let seqExpected = seqMenus;
@@ -797,11 +848,12 @@ Responda JSON: {"onboard":[...],"sequence":[...]} preenchendo os esqueletos acim
       const n = p.numCreatives || 20;
       const style = p.creativeStyle || 'persona';
       const ALT_STYLES = 'pixel art cartoon, 3D clay render fofo, flat illustration vetorial, anime retro anos 90, papercraft/recorte de papel, neon glow dark, doodle desenhado a mao, foto macro cinematica do OBJETO do nicho, low poly 3D, colagem vintage';
+      const pid = p.personaIdentity ? ` IDENTIDADE CANONICA DA PERSONA (use EXATAMENTE esta aparencia em todos os criativos com persona): ${p.personaIdentity}` : '';
       const styleLine = style === 'persona'
-        ? `ESTILO VISUAL: identidade da persona/pagina — fotografia realista da persona em cena tematica do nicho (ex: segurando o envelope), coerente com as fotos da pagina.`
+        ? `ESTILO VISUAL: identidade da persona/pagina — fotografia realista da persona em cena tematica do nicho (ex: segurando o envelope), coerente com as fotos da pagina.${pid}`
         : style === 'alt'
           ? `ESTILO VISUAL: SEM persona. Cada criativo usa UM estilo visual alternativo de ALTO CTR focado no OBJETO/simbolo do nicho (ex: a carta/envelope em pixel art cartoon). VARIE o estilo entre os criativos, escolhendo entre: ${ALT_STYLES}. Estilos inusitados quebram o padrao do feed e disparam o CTR — declare o estilo escolhido no campo "style" de cada criativo.`
-          : `ESTILO VISUAL MISTO (teste A/B): metade dos criativos com a identidade da persona (foto realista dela em cena do nicho), metade SEM persona em estilos alternativos de alto CTR focados no objeto/simbolo do nicho (varie entre: ${ALT_STYLES}). Declare o estilo no campo "style" de cada criativo.`;
+          : `ESTILO VISUAL MISTO (teste A/B): metade dos criativos com a identidade da persona (foto realista dela em cena do nicho), metade SEM persona em estilos alternativos de alto CTR focados no objeto/simbolo do nicho (varie entre: ${ALT_STYLES}). Declare o estilo no campo "style" de cada criativo.${pid}`;
       const globalRules = `REGRAS GLOBAIS (operacao multi-GEO):
 - NUNCA cite pais, cidade, regiao, moeda local ou referencia geografica em headline/texto/imagem — os criativos rodam em varios GEOs e sao traduzidos depois.
 - Headline CURTA (3-6 palavras) e SEMPRE em BRANCO puro (#FFFFFF), sem palavras destacadas em outra cor (facilita traducao).
