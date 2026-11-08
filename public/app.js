@@ -4,7 +4,9 @@
 (function(){
 'use strict';
 var CFG=null, ACCESS_PASS=sessionStorage.getItem('mbz_pass')||'', USER_KEY=localStorage.getItem('mbz_key')||'';
-var MODEL=localStorage.getItem('mbz_model')||'claude-sonnet-4-6';
+var MODEL=localStorage.getItem('mbz_model')||'claude-sonnet-5-5';
+// migra modelos antigos (4.x) salvos no navegador pros novos (5.x)
+(function(){var mig={'claude-sonnet-4-6':'claude-sonnet-5-5','claude-opus-4-8':'claude-opus-5-5','claude-haiku-4-5-20251001':'claude-haiku-5-5'};if(mig[MODEL]){MODEL=mig[MODEL];localStorage.setItem('mbz_model',MODEL)}})();
 var lastBlocks={}, lastParams={}, curStep=1, totalSteps=5;
 var $=function(s){return document.querySelector(s)}, $$=function(s){return [].slice.call(document.querySelectorAll(s))};
 
@@ -23,7 +25,8 @@ var BLOCKS=[
   {id:'meta_onboard',name:'Onboard Meta',hint:'texto',kind:'text',def:true},
   {id:'image_prompts',name:'Prompts de Imagem',hint:'fluxo',kind:'text',def:false,needsToggle:'imagePrompts'},
   {id:'creatives_prompt',name:'Criativos',hint:'prompts',kind:'text',def:false,needsToggle:'wantCreatives'},
-  {id:'audios',name:'Áudios v3',hint:'ElevenLabs',kind:'text',def:false,needsToggle:'wantAudios'}
+  {id:'audios',name:'Áudios v4',hint:'ElevenLabs',kind:'text',def:false,needsToggle:'wantAudios'},
+  {id:'broadcast',name:'Broadcasts',hint:'monetização da base',kind:'json-download',def:false,needsToggle:'wantBroadcasts'}
 ];
 var BLABEL={}; BLOCKS.forEach(function(b){BLABEL[b.id]=b.name});
 
@@ -65,7 +68,7 @@ function loadConfig(){
 }
 function fillModels(sel){
   var el=$(sel); if(!el)return; el.innerHTML='';
-  [['claude-sonnet-4-6','Sonnet 4.6 (rápido)'],['claude-opus-4-8','Opus 4.8 (qualidade)'],['claude-haiku-4-5-20251001','Haiku 4.5 (econômico)']]
+  [['claude-sonnet-5-5','Sonnet 5.5 (rápido)'],['claude-opus-5-5','Opus 5.5 (qualidade)'],['claude-fable-5-1','Fable 5.1 (máximo)'],['claude-haiku-5-5','Haiku 5.5 (econômico)']]
   .forEach(function(m){var o=document.createElement('option');o.value=m[0];o.textContent=m[1];if(m[0]===MODEL)o.selected=true;el.appendChild(o)});
   el.onchange=function(){MODEL=el.value;localStorage.setItem('mbz_model',MODEL);$('#modelFoot').textContent='modelo: '+MODEL;
     ['#optModel','#modelGlobal','#modelWizard'].forEach(function(s){if($(s))$(s).value=MODEL})};
@@ -149,6 +152,7 @@ function wireWizard(){
   }});
   $('#imagePrompts').onchange=syncBlockToggles;
   $('#wantAudios').onchange=syncBlockToggles;
+  $('#wantBroadcasts').onchange=function(){$('#broadcastOpts').classList.toggle('hidden',!this.checked);syncBlockToggles()};
 }
 function drawGridPreview(c,r){
   var el=$('#gridPreview');el.style.gridTemplateColumns='repeat('+c+',1fr)';el.innerHTML='';
@@ -186,6 +190,7 @@ function syncBlockToggles(){
   setBlk('image_prompts',$('#imagePrompts').checked);
   setBlk('creatives_prompt',$('#wantCreatives').checked);
   setBlk('audios',$('#wantAudios').checked);
+  setBlk('broadcast',$('#wantBroadcasts').checked);
   updateSummary();
 }
 function setBlk(id,on){var d=$('.blk[data-block="'+id+'"]');if(d)d.classList.toggle('on',on)}
@@ -195,7 +200,9 @@ function updateSummary(){
   var c=+$('#gridCols').value||1,r=+$('#gridRows').value||1;
   var blocks=selectedBlocks();
   var s=$('#summary');if(!s)return;
-  s.innerHTML='Vou gerar <b>'+($('#niche').value||'(nicho)')+'</b> com <b>'+($('#seqRoutes').value)+'</b> sequência(s) completas, <b>'+$('#numP1').value+'</b> P1 (+ '+$('#numP1').value+' quizzes), grid <b>'+c+'×'+r+'</b> = <b>'+(c*r)+'</b> P2s.<br>Blocos: <b>'+blocks.length+'</b> selecionados.';
+  var qf=($('#quizFormat')||{}).value==='classic'?'quizzes clássicos':'offerwalls v4.8.2';
+  var bc=$('#wantBroadcasts')&&$('#wantBroadcasts').checked?' + <b>'+(($('#numBroadcasts')||{}).value||10)+'</b> broadcasts':'';
+  s.innerHTML='Vou gerar <b>'+($('#niche').value||'(nicho)')+'</b> com <b>'+($('#seqRoutes').value)+'</b> sequência(s) completas, <b>'+$('#numP1').value+'</b> P1 (+ '+$('#numP1').value+' '+qf+'), grid <b>'+c+'×'+r+'</b> = <b>'+(c*r)+'</b> P2s'+bc+'.<br>Blocos: <b>'+blocks.length+'</b> selecionados.';
 }
 
 /* ---------- classic mode ---------- */
@@ -256,9 +263,13 @@ function collectParams(){
     platform:document.querySelector('input[name=platform]:checked').value,
     onboardRoutes:+$('#onboardRoutes').value,onboardRouteType:$('#onboardRouteType').value,
     seqRoutes:+$('#seqRoutes').value,numP1:+$('#numP1').value,
+    quizFormat:($('#quizFormat')||{}).value||'offerwall',
     gridCols:+$('#gridCols').value,gridRows:+$('#gridRows').value,
     numCreatives:+$('#numCreatives').value,creativePlatform:$('#creativePlatform').value,creativeSize:$('#creativeSize').value,
     creativeType:(document.querySelector('input[name=creativeType]:checked')||{}).value||'completo',
+    creativeStyle:(document.querySelector('input[name=creativeStyle]:checked')||{}).value||'persona',
+    numBroadcasts:+(($('#numBroadcasts')||{}).value||10),
+    broadcastImageUrl:(($('#broadcastImageUrl')||{}).value||'').trim(),
     imagePrompts:$('#imagePrompts').checked
   };
   return lastParams;
@@ -424,15 +435,23 @@ function renderGridView(j,raw){
   var h='<div class="clean-view">';
   if(g.title)h+='<h4>'+esc(g.title)+'</h4>';
   if(g.subtitle)h+='<p style="color:var(--muted);margin-bottom:12px">'+esc(g.subtitle)+'</p>';
+  if(j._pexels==='missing_key')h+='<p style="color:var(--pink);font-size:12px;margin-bottom:10px">⚠ Nenhuma chave de fotos configurada no Railway — item_image ficou vazio. Configure UMA destas: <b>UNSPLASH_ACCESS_KEY</b> (unsplash.com/developers, demo grátis), <b>PIXABAY_API_KEY</b> (pixabay.com/api/docs, aparece ao logar) ou <b>PEXELS_API_KEY</b> (se já tiver uma antiga — emissão pausada). Ou cole as URLs manualmente.</p>';
+  else if(j._pexels==='no_results')h+='<p style="color:var(--pink);font-size:12px;margin-bottom:10px">⚠ Chave configurada mas nenhuma foto encontrada (verifique se a chave é válida ou se o rate limit estourou).</p>';
+  else if(j._pexels&&j._pexels.indexOf('resolved')===0)h+='<p style="color:var(--green);font-size:12px;margin-bottom:10px">✓ Fotos reais resolvidas automaticamente ('+esc(j._pexels.split(':')[1]||'')+')</p>';
   h+='<div style="display:flex;flex-direction:column;gap:8px">';
   j.items.forEach(function(it,i){
-    var pin=it.item_image||'';
-    var url='https://www.pinterest.com/search/pins/?q='+encodeURIComponent(pin);
+    var pin=it.pexels_search||it.item_title||'';
+    var img=it.item_image||'';
+    var purl=it.item_link||('https://www.pinterest.com/search/pins/?q='+encodeURIComponent(pin));
     var id='gp_'+i;window._ipStore=window._ipStore||{};window._ipStore[id]=pin;
-    h+='<div class="kv" style="padding-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
-       '<b>'+(i+1)+'. '+esc(it.item_title||'')+'</b>'+
+    var pid='gpp_'+i;window._ipStore[pid]=it.image_prompt||'';
+    h+='<div class="kv" style="padding-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+       '<div style="display:flex;gap:10px;align-items:center">'+(img&&img.indexOf('http')===0?'<img src="'+esc(img)+'" style="width:72px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--brd)" loading="lazy">':'')+
+       '<b>'+(i+1)+'. '+esc(it.item_title||'')+'</b></div>'+
        '<button class="mini-btn ipcopy" data-ip="'+id+'">copiar busca</button></div>'+
-       '<p style="margin-top:4px"><span class="pin">📌 '+esc(pin)+'</span> &nbsp;<a href="'+esc(url)+'" target="_blank" style="color:var(--cyan);font-size:12px">abrir no Pinterest ↗</a></p></div>';
+       '<p style="margin-top:6px"><span class="pin">📷 '+esc(pin)+'</span> &nbsp;<a href="'+esc(purl)+'" target="_blank" style="color:var(--cyan);font-size:12px">Pinterest ↗</a>'+(img?' &nbsp;<a href="'+esc(img)+'" target="_blank" style="color:var(--green);font-size:12px">foto Pexels ↗</a>':'')+'</p>'+
+       (it.image_prompt?'<p style="margin-top:4px;font-size:12px;color:var(--muted)">🎨 <span style="color:var(--text)">'+esc(it.image_prompt)+'</span> <button class="mini-btn ipcopy" data-ip="'+pid+'" style="padding:2px 8px;font-size:10px">copiar prompt</button></p>':'')+
+       '</div>';
   });
   h+='</div>';
   // JSON cru recolhivel
@@ -476,6 +495,19 @@ function sanitize(b,j,raw){
     if(b==='quiz'&&j.quizzes){
       var qpi=0;
       window._quizStore=j.quizzes;
+      // formato Direct Offerwall (schema v2, plugin 4.8.2)
+      if(j.format==='offerwall'){
+        return j.quizzes.map(function(item,i){
+          var ov=item.overlay||item;
+          var h='<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="tag">OFFERWALL '+(i+1)+' · '+esc(ov.offerwall_mode||'')+' · '+esc(ov.theme_palette||'')+' · v4.8.2</span><button class="mini-btn dl qdl" data-qi="'+i+'">⬇ .json</button></div>';
+          h+='<p style="font-size:11px;color:var(--pink);letter-spacing:1px;margin:6px 0 2px">'+esc(ov.offerwall_eyebrow||'')+'</p>';
+          h+='<h4 style="margin:0 0 4px">'+esc(ov.offerwall_icon||'')+' '+esc(ov.offerwall_title||'')+'</h4>';
+          h+='<p style="font-size:13px;color:var(--text);margin:0 0 6px">'+esc(ov.offerwall_body||'')+'</p>';
+          h+='<p style="font-size:12px;color:var(--muted)"><b>Highlight:</b> '+esc(ov.offerwall_highlight||'')+' · <b>Meta:</b> '+esc(ov.offerwall_meta_text||'')+'<br><b>CTA:</b> '+esc(ov.offerwall_cta_label||'')+' · <b>Timer:</b> '+esc(ov.offerwall_timer_label||'')+'</p>';
+          h+='</div>';
+          return h;
+        }).join('')+(setTimeout(bindQuizDl,0),'');
+      }
       return j.quizzes.map(function(item,i){
         var ov=item.overlay||item;
         var h='<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="tag">QUIZ '+(i+1)+' · modo: '+esc(ov.entry_mode||'')+' · paleta: '+esc(ov.theme_palette||'')+'</span><button class="mini-btn dl qdl" data-qi="'+i+'">⬇ .json</button></div>';
@@ -548,7 +580,7 @@ function doCopy(b){
 function doDownload(b){
   var data=lastBlocks[b];if(!data||!data.json){toast('JSON inválido — veja o conteúdo.');return}
   var name=(lastParams.niche||'funil').toLowerCase().replace(/[^a-z0-9]+/g,'-');
-  var fn=b==='onboard'?'onboard-'+name+'.json':b==='sequence'?'sequencia-'+name+'.json':b==='grid'?'mirb-grid-'+name+'.json':b==='comment'?'comentarios-'+name+'.json':b+'-'+name+'.json';
+  var fn=b==='onboard'?'onboard-'+name+'.json':b==='sequence'?'sequencia-'+name+'.json':b==='grid'?'mirb-grid-'+name+'.json':b==='comment'?'comentarios-'+name+'.json':b==='broadcast'?'broadcasts-'+name+'.json':b+'-'+name+'.json';
   var blob=new Blob([JSON.stringify(data.json,null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);
   toast('Baixado: '+fn);
