@@ -31,6 +31,7 @@ export const BLOCKS = [
   { id: 'audios',          name: 'Áudios v4',         hint: 'ElevenLabs v4',     kind: 'text',          def: false, needsToggle: 'wantAudios' },
   { id: 'video_prompts',   name: 'Vídeos (Veo 3.1)',  hint: 'clipes 8s',         kind: 'text',          def: false, needsToggle: 'wantVideos' },
   { id: 'broadcast',       name: 'Broadcasts',        hint: 'templates em massa', kind: 'json-download', def: false, needsToggle: 'wantBroadcasts' },
+  { id: 'niche_app',       name: 'App & saída',       hint: 'loja do app + link de saída oficial', kind: 'text',  def: false, needsToggle: 'wantPosts' },
   { id: 'p2_posts',        name: 'Artigos P2',        hint: '1 por item do grid', kind: 'text',          def: false, needsToggle: 'wantPosts' },
   { id: 'p1_posts',        name: 'Artigos P1',        hint: '1 por título',      kind: 'text',          def: false, needsToggle: 'wantPosts' }
 ];
@@ -460,6 +461,17 @@ function renderCardBody(card) {
   if (b === 'grid_preview') { card.bodyEl.innerHTML = '<div class="clean-view">' + renderDirection(json || safeParse(raw)) + '</div>'; return; }
   if (b === 'grid') { const ctx = { ip: [], quiz: [] }; card.bodyEl.innerHTML = renderGridView(json, raw, ctx); bindBody(card, ctx); return; }
   if (b === 'broadcast') { card.bodyEl.innerHTML = renderBroadcastView(json, raw); bindJsonToggle(card); return; }
+  if (b === 'niche_app' && json) {
+    card.bodyEl.innerHTML = '<div class="niche-app">' +
+      '<div class="na-name">📱 <b>' + esc(json.app_name || '(sem app)') + '</b> <span class="pin">' + esc(json.confidence || '?') + '</span></div>' +
+      (json.play_url ? '<div>Android: <a href="' + esc(json.play_url) + '" target="_blank" rel="noopener">' + esc(json.play_url) + '</a></div>' : '') +
+      (json.ios_url ? '<div>iOS: <a href="' + esc(json.ios_url) + '" target="_blank" rel="noopener">' + esc(json.ios_url) + '</a></div>' : '') +
+      (json.why ? '<small>' + esc(json.why) + '</small>' : '') +
+      '<div class="na-exit">🚪 <b>' + esc(json.exit_label || 'Link de saída') + '</b>: ' + (json.exit_url ? '<a href="' + esc(json.exit_url) + '" target="_blank" rel="noopener">' + esc(json.exit_url) + '</a>' : '<i>(= URL do app)</i>') + '</div>' +
+      (json.exit_why ? '<small>' + esc(json.exit_why) + '</small>' : '') +
+      '<small class="muted">preenche "URL do app" e "Link de saída" no painel de publicação · confira os links antes de publicar</small></div>';
+    return;
+  }
   if (b === 'optimize') { card.bodyEl.innerHTML = '<pre>' + esc(json ? JSON.stringify(json, null, 2) : (raw || '')) + '</pre>'; return; }
 
   if (kindOf(b) === 'json-download') {

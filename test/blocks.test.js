@@ -13,7 +13,7 @@ const EXPECTED_BLOCKS = [
   'page_name', 'fb_images', 'comment', 'onboard', 'sequence',
   'grid_preview', 'grid', 'p1_titles', 'p2_titles', 'quiz',
   'meta_copy', 'meta_onboard', 'image_prompts', 'creatives_prompt',
-  'audios', 'optimize', 'persona_identity', 'video_prompts', 'broadcast', 'p1_posts', 'p2_posts'
+  'audios', 'optimize', 'persona_identity', 'video_prompts', 'broadcast', 'p1_posts', 'p2_posts', 'niche_app'
 ];
 
 test('BLOCK_META cobre todos os blocos usados pelo sistema', () => {

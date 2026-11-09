@@ -135,3 +135,36 @@ Mapeamento e requisitos em `docs/WP-PUBLISHER-ANALYSIS.md`. Dependência externa
   tabela final; o card do grid é atualizado com os links reais após publicar.
 - **Testes**: 158 (wp.js com fetch falso: ordem P2→grid→P1, links por ID, blocos, Yoast, fallback sem rota).
 - Env novo: `BLOGS_SECRET` (opcional).
+
+## 13. v4.1.1 — App do nicho + CardLinks nos artigos
+
+**Pedido:** "o claude deveria procurar apps por nicho e pôr, além de cardlink nos textos, nas P1 e nas P2" +
+"cardlink da P2 pode ser link de saída, deve ser opcional; botões da store (app-block) opcional na P1, obrigatório na P2".
+
+### Bloco `niche_app` (novo, ligado junto com "Artigos P1/P2")
+- Sem deps. O modelo responde `{app_name, android_package|null, play_url, ios_url, confidence, why}`.
+- Regra dura no prompt: só dá `android_package` com certeza absoluta (com.zzkko, com.tinder…); em dúvida, URL de
+  **busca** da Play Store (`/store/search?q=…&c=apps`) — link quebrado é pior que busca.
+- Também devolve o **link de saída** do nicho (`exit_url`, `exit_label`, `exit_why`): página oficial da marca/produto/benefício,
+  só domínio raiz conhecido, Meta/AdX-safe; sem destino claro → `exit_url = play_url`. Pré-preenche "Link de saída" no painel.
+- Artifact `nicheApp` → o painel de publicação pré-preenche **URL do app** (hint mostra app/confiança/motivo).
+  Prioridade: artifact > `appUrl` do cadastro do blog. Card do bloco mostra os links pra conferir antes de publicar.
+
+### CardLink dentro dos artigos (plugin CardLink · `cardlink/card`)
+- Prompts de P1 e P2 pedem a linha `<!--CARDLINK-->` após a 3ª/4ª seção e um objeto
+  `cardlink: { variant, internal:{eyebrow,title,description,button,chips[4]}, exit:{…} }` — duas cópias, porque o
+  destino é escolhido só na hora de publicar.
+- `fixPosts` sanitiza (`fixCardlink`: variante válida, textos sem tags, chips ≤4, formato antigo de cópia única vira `internal`) e
+  marca `has_cardlink_marker`.
+- `lib/wp.js`: `cardlinkBlock()` (mediaWidth 220, cardClickable, enableFloat br, uid `cl_…`; externo = newTab + nofollow),
+  `insertCardlink()` (troca o marcador; sem marcador entra antes do 4º `<h2>`), `htmlToBlocks` preserva o marcador entre blocos.
+- Opções do publisher (`options`): `cardlinkP1: p2|exit|none` (default **p2** = 1º artigo do grid),
+  `cardlinkP2: exit|next|none` (default **exit** = link de saída), `exitUrl` (default = URL do app).
+  P2 → "próxima P2" só existe depois de criar todas: 2ª passada com `PUT /posts/{id}` (evento `cardlink`).
+  Imagem do card: featured do destino → foto do item do grid → featured do próprio post.
+- App-block: `appP1:false` por padrão (switch "Também nos P1"); nos **P2 é sempre inserido**. URL vazia → aviso no
+  relatório + confirm no painel.
+
+### Testes
+- `test/wp.test.js`: bloco cardlink (atributos, externo, marcador em P1/P2, fallback 4º h2, limpeza sem bloco), fluxo
+  completo com `next` (2 PUTs, 100→101→100) e `exit`/`none`/sem appUrl. 160 testes verdes.

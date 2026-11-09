@@ -574,6 +574,7 @@ function wirePublisher() {
     const panel = $('#publishPanel'); panel.classList.remove('hidden');
     $('#pubProgress').classList.add('hidden'); $('#pubResult').classList.add('hidden'); $('#pubLog').innerHTML = ''; $('#pubBarFill').style.width = '0%';
     fillPubSummary();
+    prefillAppUrl(null);
     getBlogs().then(function (arr) {
       blogsCache = Array.isArray(arr) ? arr : [];
       const sel = $('#pubBlog');
@@ -596,10 +597,22 @@ function fillPubSummary() {
   $('#pubSummary').innerHTML = '<b>' + p2.length + '</b> P2 · ' + (g ? '<b>1</b> grid (' + (g.items || []).length + ' itens) · ' : '<span style="color:var(--amber)">sem grid</span> · ') + '<b>' + p1.length + '</b> P1' + (q ? ' com offerwall' : ' <span style="color:var(--amber)">(sem quiz/offerwall)</span>');
 }
 
+// URL do app: artifact nicheApp (bloco "App do nicho") > appUrl do cadastro do blog
+function prefillAppUrl(b) {
+  const na = state.artifacts && state.artifacts.nicheApp;
+  const inp = $('#pubAppUrl');
+  if (inp && !inp.value) {
+    if (na && na.play_url) { inp.value = na.play_url; $('#pubAppHint').innerHTML = '🤖 <b>' + esc(na.app_name || 'app') + '</b> (' + esc(na.confidence || '?') + ') · ' + esc(na.why || ''); }
+    else if (b && b.appUrl) inp.value = b.appUrl;
+  }
+  const ex = $('#pubExitUrl');
+  if (ex && !ex.value && na && na.exit_url) { ex.value = na.exit_url; $('#pubExitHint').innerHTML = '🤖 <b>' + esc(na.exit_label || 'destino oficial') + '</b> · ' + esc(na.exit_why || ''); }
+}
+
 function onPubBlogChange() {
   const id = $('#pubBlog').value; if (!id) return;
   const b = blogsCache.find(function (x) { return x.id === id; });
-  if (b && b.appUrl && !$('#pubAppUrl').value) $('#pubAppUrl').value = b.appUrl;
+  prefillAppUrl(b);
   const catSel = $('#pubCategory'); catSel.innerHTML = '<option value="">(carregando categorias…)</option>';
   testBlog(id).then(function (t) {
     pubCategories = (t && t.categories) || [];
@@ -627,7 +640,14 @@ function startPublish() {
   const results = {};
   ['p1_posts', 'p2_posts', 'quiz'].forEach(function (b) { if (state.results[b] && state.results[b].json) results[b] = state.results[b].json; });
   if (state.results.grid && state.results.grid.json) results.grid = exportJson('grid', state.results.grid.json);
-  const options = { status: status, appUrl: $('#pubAppUrl').value.trim() };
+  const appUrl = $('#pubAppUrl').value.trim();
+  if (!appUrl && !confirm('URL do app vazia: os P2 sairiam SEM o bloco de aplicativo (obrigatório na anatomia real). Publicar mesmo assim?')) return;
+  const options = {
+    status: status, appUrl: appUrl,
+    appP1: $('#pubAppP1').checked,
+    cardlinkP1: $('#pubCardP1').value, cardlinkP2: $('#pubCardP2').value,
+    exitUrl: $('#pubExitUrl').value.trim()
+  };
   if ($('#pubCategory').value) options.categoryId = +$('#pubCategory').value;
   $('#pubGo').disabled = true; $('#pubProgress').classList.remove('hidden'); $('#pubResult').classList.add('hidden'); $('#pubLog').innerHTML = ''; $('#pubBarFill').style.width = '2%';
   pubLog('⚡ conectando…');
@@ -635,6 +655,7 @@ function startPublish() {
     onPublishProgress: function (e) {
       if (e.step === 'connected') pubLog('✓ conectado como <b>' + esc(e.user) + '</b> (' + esc((e.roles || []).join(',')) + ')');
       else if (e.step === 'post') pubLog((e.kind === 'p1' ? '📄 P1' : '📑 P2') + ' #' + esc(e.index) + ' → <a href="' + esc(e.link) + '" target="_blank" rel="noopener">' + esc(e.title) + '</a> <span class="pin">id ' + esc(e.id) + ' · ' + esc(e.status) + '</span>');
+      else if (e.step === 'cardlink') pubLog('🃏 cardlink P2 #' + esc(e.index) + (e.to ? ' → <span class="pin">' + esc(e.to) + '</span>' : ' (sem destino)'));
       else if (e.step === 'grid') pubLog('🧩 grid <b>#' + esc(e.id) + '</b> criado com ' + esc(e.items) + ' links reais · <span class="pin">' + esc(e.block) + '</span>');
       else if (e.step === 'warning') pubLog('⚠ ' + esc(e.message), 'warn');
       else if (e.step === 'progress') { $('#pubBarFill').style.width = Math.max(2, Math.round((e.done / Math.max(1, e.total)) * 100)) + '%'; }

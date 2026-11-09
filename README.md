@@ -1,8 +1,15 @@
-# MBZ::CH4TB0T NEXUS v4.1
+# MBZ::CH4TB0T NEXUS v4.1.1
 
 Gerador completo de funis de arbitragem digital (Meta Ads -> Chatbot -> Blog AdX) 100% via API do Claude.
 Um único endpoint SSE gera todos os blocos do funil em paralelo, respeitando as dependências entre eles,
 com o texto de cada bloco chegando ao vivo na tela conforme o modelo escreve.
+
+## Novidades da v4.1.1 — App do nicho + CardLinks nos artigos
+- Bloco **App do nicho**: descobre o app oficial do nicho (Play Store; URL de busca quando não tem certeza do pacote)
+  e pré-preenche a URL do bloco de aplicativo no painel de publicação.
+- **CardLink** no meio dos P1 e P2 (plugin CardLink): P1 → 1º artigo do grid ou link de saída; P2 → próxima P2
+  (circular) ou link de saída; ou nenhum. Imagem = featured do destino.
+- App-block **opcional nos P1** (switch), **sempre nos P2**. Detalhes em `docs/V4-RELEASE.md` §13.
 
 ## Novidades da v4.1 — Publisher WordPress
 - **📝 Artigos P1 e P2 completos** (toggle no passo 4): um P2 por item do grid e um P1 por título, ~1.200

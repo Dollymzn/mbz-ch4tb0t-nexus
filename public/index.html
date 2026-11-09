@@ -339,7 +339,7 @@
       <button id="publishBtn" class="btn-primary hidden">🌐 Publicar no blog</button>
     </div>
 
-    <!-- ===== PUBLISHER (v4.1) ===== -->
+    <!-- ===== PUBLISHER (v4.1.1) ===== -->
     <div id="publishPanel" class="publish-panel hidden">
       <div class="publish-head">
         <div>
@@ -368,9 +368,33 @@
           <small>carregada do blog ao selecionar</small>
         </div>
         <div class="sel-card">
-          <label>URL do app (botão interno)</label>
+          <label>URL do app (bloco de aplicativo)</label>
           <input type="text" id="pubAppUrl" placeholder="https://play.google.com/store/apps/details?id=…">
-          <small>opcional · nicho de app</small>
+          <small id="pubAppHint">obrigatório nos P2 · sugerido pelo bloco "App do nicho"</small>
+          <label class="switch-inline"><input type="checkbox" id="pubAppP1"><span class="slider"></span> Também nos P1 (opcional)</label>
+        </div>
+        <div class="sel-card">
+          <label>CardLink nos P1</label>
+          <select id="pubCardP1">
+            <option value="p2" selected>→ 1º artigo do grid (P2)</option>
+            <option value="exit">→ link de saída</option>
+            <option value="none">nenhum</option>
+          </select>
+          <small>card no meio do texto (plugin CardLink)</small>
+        </div>
+        <div class="sel-card">
+          <label>CardLink nos P2</label>
+          <select id="pubCardP2">
+            <option value="exit" selected>→ link de saída</option>
+            <option value="next">→ próxima P2 (circular)</option>
+            <option value="none">nenhum</option>
+          </select>
+          <small>mantém o leitor no funil</small>
+        </div>
+        <div class="sel-card">
+          <label>Link de saída (cards "exit")</label>
+          <input type="text" id="pubExitUrl" placeholder="vazio = URL do app">
+          <small id="pubExitHint">sugerido pelo bloco "App &amp; saída" · nova aba, nofollow</small>
         </div>
       </div>
       <div class="publish-actions">
@@ -478,7 +502,7 @@
     <div id="blogList" class="blog-list"></div>
   </section>
 
-  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.1 · <span id="modelFoot"></span></footer>
+  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.1.1 · <span id="modelFoot"></span></footer>
 </div>
 
 <!-- ===== API KEY MODAL ===== -->

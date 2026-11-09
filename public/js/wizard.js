@@ -176,6 +176,7 @@ export function syncBlockToggles() {
   const wp = $('#wantPosts') && $('#wantPosts').checked;
   setBlk('p2_posts', wp);
   setBlk('p1_posts', wp);
+  setBlk('niche_app', wp);
   if (wp) { ['p1_titles', 'p2_titles', 'grid', 'quiz'].forEach(function (b) { setBlk(b, true); }); } // artigos precisam dos títulos, do grid e do offerwall
   updateSummary();
   scheduleDraft();
