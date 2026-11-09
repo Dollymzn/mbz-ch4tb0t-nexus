@@ -181,3 +181,30 @@ Mapeamento e requisitos em `docs/WP-PUBLISHER-ANALYSIS.md`. Dependência externa
   servidor acordar sem nenhum, chama `POST /api/blogs/restore` (upsert por url+user; entradas que não decifram são
   ignoradas e o usuário é avisado de que o segredo mudou).
 - **Setup definitivo no Railway:** Settings → Volumes → Add Volume, mount path `/data`; variável `DATA_DIR=/data`.
+
+## 14. v4.1.1 — Crítico convergente + "Aplicar sugestões" que edita de verdade
+
+**Sintoma:** Identidade Visual regenerada 5× com as sugestões e o crítico sempre achava problema novo.
+
+**Causas:** (1) "Aplicar sugestões" chamava uma regeneração do zero passando só `problemas` + `direção` (as
+`sugestoes` nem iam) → o modelo reescrevia tudo e criava defeitos novos; (2) o crítico pedia campos
+(`signature_prop`, `hook_line`, expressões por estágio) que o schema proibia ("mantenha EXATAMENTE o schema") →
+impossível aplicar; (3) `persona_identity` não tinha rubrica própria (caía na genérica) e cada análise inventava
+critério novo, sem saber o que já tinha sido pedido.
+
+**Correções**
+- `agentFeedbackBlock(fb, previousJson)`: com JSON anterior vira **MODO EDIÇÃO** — "resolva cada problema, aplique
+  cada sugestão, o resto permanece idêntico, nunca invente chaves". O front manda `_previousJson = card.json` no
+  Aplicar; o loop automático do NEXUS Agent também (regen = edição da versão atual). Sem JSON anterior, o bloco
+  antigo agora inclui as sugestões.
+- Schema da **Identidade Visual** expandido: `signature_prop[]` (props separados do wardrobe), `stage_expressions
+  {curiosity, reveal, urgency}`, `hook_line` (idioma da campanha, ≤14 palavras), `allowed[]` (resolve "prop vs
+  proibido", ex.: raspadinha não é cartão de pagamento), `photo_style` = 1 direção só. `personaIdentityLine`
+  injeta props/expressões/gancho/permitidos em todos os blocos de imagem/vídeo. Card renderiza os campos novos.
+- Rubrica própria `REVIEW_RUBRICS.persona_identity` (5 critérios, schema permitido declarado, "sem pedir campos
+  novos").
+- Prompt do crítico: **exaustivo** (`checklist` por critério ok|falha; "problemas" com TODOS os defeitos de uma
+  vez, apontando o campo; cada sugestão = edição concreta dentro do schema) e **convergente** (recebe
+  `previousReview` → devolve `resolvidos`/`pendentes`, "não introduza critérios fora da rubrica, não mova a trave").
+- UI: botão "✎ Aplicar N sugestões (edita, não recria)" → edita → **re-analisa sozinho** passando a revisão
+  anterior; painel mostra ✓ Resolvidos / ↻ Pendentes / Checklist. "Analisar" manual também confere a última revisão.

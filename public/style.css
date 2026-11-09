@@ -1120,3 +1120,15 @@
 .storage-banner.ok{border-color:rgba(var(--cyan-rgb)/.35);background:rgba(var(--cyan-rgb)/.06)}
 .storage-banner.warn{border-color:var(--amber,#ffb020);background:rgba(255,176,32,.08);color:var(--amber,#ffb020)}
 .storage-banner code{font-family:var(--mono,monospace);background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px}
+
+/* review v4.1.1 — checklist / resolvidos / aplicar */
+.review-panel-view .rv-ok{color:var(--cyan)}
+.review-panel-view .rv-bad{color:var(--amber,#ffb020)}
+.rv-check{list-style:none;padding:0;margin:4px 0 10px}
+.rv-check li{padding:3px 0;font-size:13px}
+.rv-check li .rv-mark{display:inline-block;width:18px;font-weight:700}
+.rv-check li.ok .rv-mark{color:var(--cyan)}
+.rv-check li.bad .rv-mark{color:var(--pink)}
+.rv-actions{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
+.rv-actions small{opacity:.6}
+.persona-hook{font-size:15px;font-style:italic;color:var(--cyan)}

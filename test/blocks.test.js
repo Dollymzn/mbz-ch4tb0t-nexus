@@ -6,7 +6,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildBlockPrompt, BLOCK_META, KNOWN_BLOCKS } = require('../lib/blocks');
+const { buildBlockPrompt, BLOCK_META, KNOWN_BLOCKS, personaIdentityLine } = require('../lib/blocks');
 
 // v3.2a: 16 → 18 blocos reais (KNOWN_BLOCKS) — soma persona_identity + video_prompts.
 const EXPECTED_BLOCKS = [
@@ -157,5 +157,24 @@ test('v4.0.2 — prompts de imagem/vídeo carregam as regras de segurança do Fl
   });
   const fb = buildBlockPrompt('fb_images', p);
   assert.ok(!fb.includes('bandeira sutil'), 'capa não pede bandeira do país');
-  assert.ok(buildBlockPrompt('persona_identity', p).includes('PROIBIDO escrever nacionalidade'));
+  assert.ok(buildBlockPrompt('persona_identity', p).includes('PROIBIDO nacionalidade/etnia/país'));
+});
+
+test('v4.1.1 — Aplicar sugestões = MODO EDIÇÃO (JSON anterior + todas as sugestões); crítico exaustivo e convergente', () => {
+  const fb = { problemas: ['core: vago'], sugestoes: ['core → adicionar textura do cabelo'], direcao_de_correcao: 'editar core' };
+  const edit = buildBlockPrompt('persona_identity', { niche: 'x', _agentFeedback: fb, _previousJson: { identity: { core: 'ANTIGO' } } });
+  assert.ok(edit.includes('MODO EDIÇÃO') && edit.includes('"core": "ANTIGO"') && edit.includes('core → adicionar textura do cabelo') && edit.includes('permanece IDÊNTICO'));
+  const regen = buildBlockPrompt('persona_identity', { niche: 'x', _agentFeedback: fb });
+  assert.ok(!regen.includes('MODO EDIÇÃO') && regen.includes('core → adicionar textura do cabelo'), 'sem JSON anterior: regen tradicional, mas com as sugestões');
+  // schema novo da identidade
+  const pi = buildBlockPrompt('persona_identity', { niche: 'x', pageName: 'Clara', campaignLang: 'pt-BR' });
+  ['signature_prop', 'stage_expressions', 'hook_line', '"allowed"'].forEach(k => assert.ok(pi.includes(k), k));
+  // review: checklist + rubrica própria + convergência
+  const rv = buildBlockPrompt('review', { review: { target: 'persona_identity', json: {}, params: {} } });
+  assert.ok(rv.includes('"checklist"') && rv.includes('Reprodutibilidade do rosto') && rv.includes('NÃO peça campos fora dele') && !rv.includes('CONVERGÊNCIA'));
+  const rv2 = buildBlockPrompt('review', { review: { target: 'persona_identity', json: {}, params: {}, previousReview: { problemas: ['p1'], sugestoes: ['s1'] } } });
+  assert.ok(rv2.includes('CONVERGÊNCIA') && rv2.includes('p1') && rv2.includes('Não mova a trave'));
+  // identity line carrega props/expressões/gancho pros blocos dependentes
+  const line = personaIdentityLine({ personaIdentity: { core: 'c', wardrobe: ['w'], signature_prop: ['sealed envelope'], stage_expressions: { curiosity: 'raised brow' }, hook_line: 'oi', allowed: ['scratch card (game prop)'] } });
+  assert.ok(line.includes('Props assinatura: sealed envelope') && line.includes('curiosidade: raised brow') && line.includes('Gancho central da persona: "oi"') && line.includes('scratch card (game prop)'));
 });

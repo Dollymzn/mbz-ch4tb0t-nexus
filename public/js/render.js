@@ -257,10 +257,22 @@ export function makeRunView(container, opts) {
     let h = panel ? '<div class="clean-view review-panel-view">' : '';
     h += '<div class="review-score"><span class="tag">score ' + esc(score) + '/10</span>' +
       (review.veredito ? '<b>' + esc(review.veredito) + '</b>' : '') + '</div>';
-    if (review.problemas && review.problemas.length) h += '<h4>Problemas</h4>' + ulist(review.problemas);
-    if (review.sugestoes && review.sugestoes.length) h += '<h4>Sugestões</h4>' + ulist(review.sugestoes);
+    if (review.resolvidos && review.resolvidos.length) h += '<h4 class="rv-ok">✓ Resolvidos desde a última análise</h4>' + ulist(review.resolvidos);
+    if (review.pendentes && review.pendentes.length) h += '<h4 class="rv-bad">↻ Ainda pendentes</h4>' + ulist(review.pendentes);
+    if (review.checklist && review.checklist.length) {
+      h += '<h4>Checklist da rubrica</h4><ul class="rv-check">' + review.checklist.map(function (c) {
+        const ok = String(c.status || '').toLowerCase() === 'ok';
+        return '<li class="' + (ok ? 'ok' : 'bad') + '"><span class="rv-mark">' + (ok ? '✓' : '✕') + '</span> <b>' + esc(c.criterio || '') + '</b>' + (c.detalhe ? ' — ' + esc(c.detalhe) : '') + '</li>';
+      }).join('') + '</ul>';
+    }
+    if (review.problemas && review.problemas.length) h += '<h4>Problemas (' + review.problemas.length + ')</h4>' + ulist(review.problemas);
+    if (review.sugestoes && review.sugestoes.length) h += '<h4>Sugestões (' + review.sugestoes.length + ')</h4>' + ulist(review.sugestoes);
     if (review.direcao_de_correcao) h += '<h4>Direção</h4><p>' + esc(review.direcao_de_correcao) + '</p>';
-    if (panel) h += '<button class="mini-btn apply-review" type="button">Aplicar sugestões</button></div>';
+    if (panel) {
+      const n = (review.sugestoes || []).length + (review.problemas || []).length;
+      h += '<div class="rv-actions"><button class="mini-btn apply-review" type="button">✎ Aplicar ' + (review.sugestoes || []).length + ' sugestões (edita, não recria)</button>' +
+        (n ? '<small>edita só o apontado e re-analisa em seguida</small>' : '') + '</div></div>';
+    }
     return h;
   }
   function showReview(card, review, asPanel) {
@@ -277,10 +289,15 @@ export function makeRunView(container, opts) {
     const btn = card.reviewPanelEl.querySelector('.apply-review');
     if (btn) btn.addEventListener('click', function (e) {
       e.stopPropagation();
+      // v4.1.1: EDITA a versão atual (JSON anterior vai junto) e re-analisa com a revisão anterior
+      //         pra mostrar o que foi resolvido — em vez de recriar do zero e achar defeito novo.
+      const prevJson = card.json;
+      card.reviewPanelEl.innerHTML = '<div class="clean-view"><span class="tag">APLICANDO</span><p><span class="spinner"></span> editando o bloco com as ' + (review.sugestoes || []).length + ' sugestões…</p></div>';
       regen(card.block, {
         blocks: [card.block],
-        params: Object.assign({}, state.params, { _agentFeedback: review }),
-        artifacts: state.artifacts
+        params: Object.assign({}, state.params, { _agentFeedback: review, _previousJson: prevJson }),
+        artifacts: state.artifacts,
+        _afterDone: function () { analyzeCard(card, review); }
       });
     });
   }
@@ -414,19 +431,26 @@ export function makeRunView(container, opts) {
     // views secundárias (otimizador) podem fornecer o payload correto por bloco
     let payload = opts.buildRegenPayload ? opts.buildRegenPayload(block) : null;
     if (!payload) payload = { blocks: [block], params: state.params, model: state.model, artifacts: state.artifacts };
+    const afterDone = extra && extra._afterDone;
+    if (extra) { extra = Object.assign({}, extra); delete extra._afterDone; }
     payload = Object.assign(payload, extra || {});
+    if (afterDone) {
+      const origDone = h.onBlockDone;
+      h.onBlockDone = function (d) { origDone(d); if (d.block === block) setTimeout(function () { afterDone(d); }, 50); };
+    }
     runStream(payload, h);
   }
 
   // render estático (histórico): sem marcar dependentes como desatualizados
-  function analyzeCard(card) {
+  function analyzeCard(card, previousReview) {
     if (!card || !card.json) { toast('Sem JSON para analisar.'); return; }
     card.reviewPanelEl.classList.remove('hidden');
-    card.reviewPanelEl.innerHTML = '<div class="clean-view"><span class="tag">ANÁLISE</span><p><span class="spinner"></span> revisando bloco...</p></div>';
+    card.reviewPanelEl.innerHTML = '<div class="clean-view"><span class="tag">ANÁLISE</span><p><span class="spinner"></span> ' + (previousReview ? 'conferindo se as sugestões foram aplicadas…' : 'revisando bloco (todos os critérios da rubrica)…') + '</p></div>';
+    const prev = previousReview || card.review || null; // re-análise manual também confere a anterior
     runStream({
       blocks: ['review'],
       model: state.model,
-      params: { review: { target: card.block, json: card.json, params: state.params } }
+      params: { review: { target: card.block, json: card.json, params: state.params, previousReview: prev ? { problemas: prev.problemas, sugestoes: prev.sugestoes } : undefined } }
     }, {
       onBlockDone: function (d) {
         if (d.block !== 'review') return;
@@ -756,8 +780,13 @@ function sanitize(b, j, raw, ctx) {
       if (id.core) h += '<div class="kv"><p class="persona-core">' + esc(id.core) + '</p></div>';
       if (Array.isArray(id.wardrobe) && id.wardrobe.length) h += '<div class="kv"><h4>Guarda-roupa</h4>' + ulist(id.wardrobe) + '</div>';
       if (Array.isArray(id.palette) && id.palette.length) h += '<div class="kv"><h4>Paleta</h4><p>' + id.palette.map(function (c) { return '<span class="tag">' + esc(c) + '</span>'; }).join(' ') + '</p></div>';
+      if (id.hook_line) h += '<div class="kv"><h4>Gancho central</h4><p class="persona-hook">“' + esc(id.hook_line) + '”</p></div>';
+      if (Array.isArray(id.signature_prop) && id.signature_prop.length) h += '<div class="kv"><h4>Props assinatura</h4>' + ulist(id.signature_prop) + '</div>';
       if (id.photo_style) h += '<div class="kv"><h4>Estilo fotográfico</h4><p>' + esc(id.photo_style) + '</p></div>';
-      if (id.avoid) h += '<div class="kv"><h4>Nunca alterar</h4><p>' + esc(id.avoid) + '</p></div>';
+      const se = id.stage_expressions;
+      if (se && typeof se === 'object') h += '<div class="kv"><h4>Expressão por estágio</h4><ul>' + ['curiosity', 'reveal', 'urgency'].filter(function (k) { return se[k]; }).map(function (k) { return '<li><b>' + ({ curiosity: 'curiosidade', reveal: 'revelação', urgency: 'urgência' })[k] + '</b>: ' + esc(se[k]) + '</li>'; }).join('') + '</ul></div>';
+      if (Array.isArray(id.allowed) && id.allowed.length) h += '<div class="kv"><h4>Permitidos (não confundir)</h4>' + ulist(id.allowed) + '</div>';
+      if (id.avoid) h += '<div class="kv"><h4>Nunca alterar (nota interna)</h4><p>' + esc(id.avoid) + '</p></div>';
       return h;
     }
     // v3.2a/v4 — criativos de vídeo Veo 3.1 / Google Flow (clipes de ~8s, 9:16 ou 16:9)
@@ -940,7 +969,7 @@ export function cleanText(b, j, raw) {
     if (b === 'audios' && j.audios) return j.audios.map(function (a) { return '#' + a.index + ' [' + a.voice + ']\n' + a.script; }).join('\n\n');
     if (b === 'image_prompts') { const o = (j.onboard || []).map(function (x) { return x.step + ': ' + x.prompt; }).join('\n'); const s = (j.sequence || []).map(function (x) { return 'r' + x.route + ' ' + x.step + ': ' + x.prompt; }).join('\n'); return 'ONBOARD:\n' + o + '\n\nSEQUÊNCIA:\n' + s; }
     // v3.2a: identidade pronta pra colar num gerador de imagem (core + guarda-roupa + estilo)
-    if (b === 'persona_identity') { const id = j.identity || j; const w = Array.isArray(id.wardrobe) ? id.wardrobe.join('\n') : (id.wardrobe || ''); return [id.core || '', w, id.photo_style || ''].filter(Boolean).join('\n\n'); }
+    if (b === 'persona_identity') { const id = j.identity || j; const w = Array.isArray(id.wardrobe) ? id.wardrobe.join('\n') : (id.wardrobe || ''); const pr = Array.isArray(id.signature_prop) ? id.signature_prop.join('\n') : ''; return [id.core || '', w, pr, id.photo_style || '', id.hook_line || ''].filter(Boolean).join('\n\n'); }
     if (b === 'video_prompts' && j.videos) return j.videos.map(function (v) { return '#' + v.index + ' ' + (v.concept || '') + '\n' + (v.prompt || '') + (v.cta ? '\nCTA: ' + v.cta : ''); }).join('\n\n');
   } catch (e) {}
   return JSON.stringify(j, null, 2);
