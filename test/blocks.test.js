@@ -178,3 +178,16 @@ test('v4.1.1 — Aplicar sugestões = MODO EDIÇÃO (JSON anterior + todas as su
   const line = personaIdentityLine({ personaIdentity: { core: 'c', wardrobe: ['w'], signature_prop: ['sealed envelope'], stage_expressions: { curiosity: 'raised brow' }, hook_line: 'oi', allowed: ['scratch card (game prop)'] } });
   assert.ok(line.includes('Props assinatura: sealed envelope') && line.includes('curiosidade: raised brow') && line.includes('Gancho central da persona: "oi"') && line.includes('scratch card (game prop)'));
 });
+
+test('v4.1.1 — áudios: catálogo ElevenLabs real no prompt e postprocess normaliza voz/voice_id', () => {
+  const { VOICES } = require('../lib/voices');
+  const fixAudios = require('../lib/postprocess/audios');
+  assert.ok(VOICES.length >= 80 && VOICES.every(v => v.id && v.name));
+  const pr = buildBlockPrompt('audios', { niche: 'x', flowLang: 'pt-BR', numCreatives: 2 });
+  assert.ok(pr.includes('cgSgspJ2msm6clMCkdW9') && pr.includes('Thais - Youthful and Feminine') && pr.includes('"voice_main"'));
+  const out = fixAudios({ voice_main: { name: 'jessica' }, audios: [{ index: 1, voice: 'Thais', script: 's' }, { index: 2, voice: 'Inexistente', script: 's' }, { index: 3, voice_id: 'ORgG8rwdAiMYRug8RJwR', script: 's' }] });
+  assert.equal(out.voice_main.id, 'cgSgspJ2msm6clMCkdW9');
+  assert.equal(out.audios[0].voice_id, '5EtawPduB139avoMLQgH');
+  assert.equal(out.audios[1].voice_id, 'cgSgspJ2msm6clMCkdW9', 'voz desconhecida cai na principal');
+  assert.equal(out.audios[2].voice, 'Ana Alice - Friendly & Clear');
+});

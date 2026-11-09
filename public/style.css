@@ -1132,3 +1132,6 @@
 .rv-actions{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
 .rv-actions small{opacity:.6}
 .persona-hook{font-size:15px;font-style:italic;color:var(--cyan)}
+
+.voice-id{font-family:var(--mono,monospace);font-size:11px;opacity:.75;cursor:text;user-select:all}
+.voice-main small{opacity:.7}

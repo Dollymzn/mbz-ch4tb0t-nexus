@@ -767,9 +767,15 @@ function sanitize(b, j, raw, ctx) {
       return h;
     }
     if (b === 'audios' && j.audios) {
-      return j.audios.map(function (a) {
+      let head = '';
+      if (j.voice_main && j.voice_main.name) {
+        head = '<div class="kv voice-main"><span class="tag">VOZ DA PERSONA (ElevenLabs)</span><p>🎙 <b>' + esc(j.voice_main.name) + '</b> <span class="pin voice-id">' + esc(j.voice_main.id || '') + '</span>' +
+          (j.voice_alt && j.voice_alt.name ? ' · alternativa A/B: <b>' + esc(j.voice_alt.name) + '</b> <span class="pin voice-id">' + esc(j.voice_alt.id || '') + '</span>' : '') + '</p>' +
+          (j.voice_reason ? '<small>' + esc(j.voice_reason) + '</small>' : '') + '</div>';
+      }
+      return head + j.audios.map(function (a) {
         const stab = (a.stability != null && a.stability !== '') ? ' · stability ' + esc(a.stability) : '';
-        return '<div class="kv"><span class="tag">#' + (a.index || '') + ' · voz: ' + esc(a.voice || '') + stab + '</span><p style="white-space:pre-wrap">' + esc(a.script || '') + '</p></div>';
+        return '<div class="kv"><span class="tag">#' + (a.index || '') + ' · voz: ' + esc(a.voice || '') + stab + '</span>' + (a.voice_id ? ' <span class="pin voice-id" title="voice_id ElevenLabs">' + esc(a.voice_id) + '</span>' : '') + '<p style="white-space:pre-wrap">' + esc(a.script || '') + '</p></div>';
       }).join('');
     }
     // v3.2a — identidade visual fixa da persona (mesmo rosto em todo o funil)
@@ -966,7 +972,7 @@ export function cleanText(b, j, raw) {
     if (b === 'creatives_prompt' && j.prompt) return j.prompt;
     if (b === 'creatives_prompt' && j.prompts) return j.prompts.map(function (p) { return '#' + p.index + ' ' + (p.headline || '') + '\n' + p.prompt + '\nCTA: ' + (p.cta || ''); }).join('\n\n');
     if (b === 'creative_analysis') return JSON.stringify({ analysis: j.analysis || {}, variations: j.variations || [] }, null, 2);
-    if (b === 'audios' && j.audios) return j.audios.map(function (a) { return '#' + a.index + ' [' + a.voice + ']\n' + a.script; }).join('\n\n');
+    if (b === 'audios' && j.audios) return (j.voice_main ? 'VOZ: ' + j.voice_main.name + ' (' + j.voice_main.id + ')\n\n' : '') + j.audios.map(function (a) { return '#' + a.index + ' [' + a.voice + (a.voice_id ? ' · ' + a.voice_id : '') + ']\n' + a.script; }).join('\n\n');
     if (b === 'image_prompts') { const o = (j.onboard || []).map(function (x) { return x.step + ': ' + x.prompt; }).join('\n'); const s = (j.sequence || []).map(function (x) { return 'r' + x.route + ' ' + x.step + ': ' + x.prompt; }).join('\n'); return 'ONBOARD:\n' + o + '\n\nSEQUÊNCIA:\n' + s; }
     // v3.2a: identidade pronta pra colar num gerador de imagem (core + guarda-roupa + estilo)
     if (b === 'persona_identity') { const id = j.identity || j; const w = Array.isArray(id.wardrobe) ? id.wardrobe.join('\n') : (id.wardrobe || ''); const pr = Array.isArray(id.signature_prop) ? id.signature_prop.join('\n') : ''; return [id.core || '', w, pr, id.photo_style || '', id.hook_line || ''].filter(Boolean).join('\n\n'); }

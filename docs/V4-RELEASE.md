@@ -208,3 +208,13 @@ critério novo, sem saber o que já tinha sido pedido.
   `previousReview` → devolve `resolvidos`/`pendentes`, "não introduza critérios fora da rubrica, não mova a trave").
 - UI: botão "✎ Aplicar N sugestões (edita, não recria)" → edita → **re-analisa sozinho** passando a revisão
   anterior; painel mostra ✓ Resolvidos / ↻ Pendentes / Checklist. "Analisar" manual também confere a última revisão.
+
+## 15. v4.1.1 — Vozes ElevenLabs reais (catálogo da conta)
+- `lib/voices.js`: 86 vozes da conta (nome, descrição, `voice_id`) extraídas do seletor da Frame IA/ElevenLabs.
+- Prompt de `audios` recebe o catálogo inteiro e só pode escolher dali: UMA voz principal da persona
+  (`voice_main`, escolhida pelo TIMBRE — gênero/idade/tom do nicho; toda voz fala todos os idiomas, sem filtrar por GEO),
+  no máximo uma alternativa A/B (`voice_alt`) e `voice`/`voice_id` por áudio.
+- `postprocess/audios.js`: normaliza nome/id pelo catálogo (voz fora do catálogo → cai na principal; id sempre
+  preenchido; warning por item).
+- Card de áudios mostra a voz da persona com o id (selecionável pra copiar) e o id em cada áudio; o "copiar" leva
+  nome + id.
