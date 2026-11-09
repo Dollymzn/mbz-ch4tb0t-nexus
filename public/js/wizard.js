@@ -18,7 +18,7 @@ const FIELD_IDS = ['niche', 'geoCountry', 'campaignLang', 'pageName', 'flowLang'
   'persona', 'modelWizard', 'onboardRoutes', 'onboardRouteType', 'seqRoutes', 'numP1', 'gridCols', 'gridRows',
   'numCreatives', 'creativePlatform', 'creativeSize', 'numVideos', 'videoRatio',
   'quizFormat', 'numBroadcasts', 'broadcastImageUrl'];
-const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'wantVideos', 'wantBroadcasts', 'utmNative', 'agentQuality'];
+const CHECK_IDS = ['imagePrompts', 'wantCreatives', 'wantAudios', 'wantVideos', 'wantBroadcasts', 'wantPosts', 'utmNative', 'agentQuality'];
 
 let curStep = 1;
 const totalSteps = 5;
@@ -83,6 +83,7 @@ function wireWizard() {
   $('#wantAudios').onchange = syncBlockToggles;
   $('#wantVideos').onchange = function () { updateVideoUI(); syncBlockToggles(); };
   $('#wantBroadcasts').onchange = function () { updateBroadcastUI(); syncBlockToggles(); };
+  if ($('#wantPosts')) $('#wantPosts').onchange = syncBlockToggles;
   $('#agentQuality').onchange = function () { updateSummary(); scheduleDraft(); };
 
   // auto-save do rascunho: qualquer input/change no wizard
@@ -172,6 +173,10 @@ export function syncBlockToggles() {
   setBlk('audios', $('#wantAudios').checked);
   setBlk('video_prompts', $('#wantVideos').checked);
   setBlk('broadcast', $('#wantBroadcasts').checked);
+  const wp = $('#wantPosts') && $('#wantPosts').checked;
+  setBlk('p2_posts', wp);
+  setBlk('p1_posts', wp);
+  if (wp) { ['p1_titles', 'p2_titles', 'grid', 'quiz'].forEach(function (b) { setBlk(b, true); }); } // artigos precisam dos títulos, do grid e do offerwall
   updateSummary();
   scheduleDraft();
 }
@@ -193,6 +198,7 @@ export function updateSummary() {
     '</b> sequência(s) completas, <b>' + esc($('#numP1').value) + '</b> P1 (+ ' + esc($('#numP1').value) +
     ' ' + qf + '), grid <b>' + c + '×' + r + '</b> = <b>' + (c * r) + '</b> P2s' +
     (nB ? ', <b>' + nB + '</b> broadcasts (lotes de 50)' : '') +
+    ($('#wantPosts') && $('#wantPosts').checked ? ', <b>artigos P1+P2</b> completos (' + (c * r + (+$('#numP1').value || 0)) + ' posts)' : '') +
     '.<br>Blocos: <b>' + blocks.length + '</b> selecionados.' +
     (ag && ag.checked ? '<br><span class="agent-cost-line">🛡 Agente ligado: + até ' + reviewable + ' revisões nesta run.</span>' : '');
 }

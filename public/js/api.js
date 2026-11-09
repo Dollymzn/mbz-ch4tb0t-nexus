@@ -55,8 +55,13 @@ const EVENT_MAP = {
   block_error: 'onBlockError',
   agent_reviewing: 'onAgentReviewing',
   agent_review:    'onAgentReview',
+  block_progress:  'onBlockProgress',   // v4.1: lotes (broadcast/artigos)
   run_done:    'onRunDone',
-  run_error:   'onRunError'
+  run_error:   'onRunError',
+  // v4.1 Publisher (POST /api/publish)
+  publish_progress: 'onPublishProgress',
+  publish_done:     'onPublishDone',
+  publish_error:    'onPublishError'
 };
 
 export function runStream(payload, handlers) {
@@ -160,4 +165,43 @@ function dispatchFrame(frame, handlers) {
 function emit(handlers, name, data) {
   const fn = handlers && handlers[name];
   if (typeof fn === 'function') { try { fn(data); } catch (e) { /* handler nunca derruba o stream */ console.error(e); } }
+}
+
+
+/* ============================================================
+   v4.1 — Publisher WordPress
+   ============================================================ */
+export function getBlogs() {
+  return fetch('/api/blogs', { headers: authHeaders() }).then(function (r) { return r.json(); });
+}
+export function addBlog(data) {
+  return fetch('/api/blogs', { method: 'POST', headers: authHeaders(), body: JSON.stringify(data) }).then(function (r) { return r.json(); });
+}
+export function deleteBlog(id) {
+  return fetch('/api/blogs/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() }).then(function (r) { return r.json(); });
+}
+export function testBlog(id) {
+  return fetch('/api/blogs/' + encodeURIComponent(id) + '/test', { method: 'POST', headers: authHeaders() }).then(function (r) { return r.json(); });
+}
+
+// POST /api/publish como stream SSE: handlers onPublishProgress / onPublishDone / onPublishError / onStreamEnd
+export function publishStream(payload, handlers) {
+  const controller = new AbortController();
+  fetch('/api/publish', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload), signal: controller.signal })
+    .then(function (res) {
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (!res.ok || ct.indexOf('text/event-stream') < 0) {
+        return res.text().then(function (txt) {
+          let msg = 'Erro HTTP ' + res.status;
+          try { const j = JSON.parse(txt); msg = j.error || j.message || msg; } catch (e) {}
+          emit(handlers, 'onPublishError', { message: msg });
+        });
+      }
+      return consume(res.body, handlers, controller);
+    })
+    .catch(function (e) {
+      if (controller.signal.aborted) { emit(handlers, 'onAbort', {}); return; }
+      emit(handlers, 'onPublishError', { message: (e && e.message) || 'falha de rede' });
+    });
+  return controller;
 }

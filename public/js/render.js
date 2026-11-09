@@ -30,7 +30,9 @@ export const BLOCKS = [
   { id: 'creatives_prompt',name: 'Criativos',         hint: 'prompts',           kind: 'text',          def: false, needsToggle: 'wantCreatives' },
   { id: 'audios',          name: 'Áudios v4',         hint: 'ElevenLabs v4',     kind: 'text',          def: false, needsToggle: 'wantAudios' },
   { id: 'video_prompts',   name: 'Vídeos (Veo 3.1)',  hint: 'clipes 8s',         kind: 'text',          def: false, needsToggle: 'wantVideos' },
-  { id: 'broadcast',       name: 'Broadcasts',        hint: 'templates em massa', kind: 'json-download', def: false, needsToggle: 'wantBroadcasts' }
+  { id: 'broadcast',       name: 'Broadcasts',        hint: 'templates em massa', kind: 'json-download', def: false, needsToggle: 'wantBroadcasts' },
+  { id: 'p2_posts',        name: 'Artigos P2',        hint: '1 por item do grid', kind: 'text',          def: false, needsToggle: 'wantPosts' },
+  { id: 'p1_posts',        name: 'Artigos P1',        hint: '1 por título',      kind: 'text',          def: false, needsToggle: 'wantPosts' }
 ];
 export const BLABEL = {};
 BLOCKS.forEach(function (b) { BLABEL[b.id] = b.name; });
@@ -164,11 +166,11 @@ export function makeRunView(container, opts) {
   }
 
   /* ---------- estados visuais ---------- */
-  function setStatus(card, st) {
+  function setStatus(card, st, label) {
     card.status = st;
     card.statusEl.className = 'block-status ' + st;
     card.statusEl.innerHTML =
-      st === 'loading' ? '<span class="spinner"></span> gerando' :
+      st === 'loading' ? '<span class="spinner"></span> ' + (label ? esc(label) : 'gerando') :
       st === 'reviewing' ? '🔍 revisando' :
       st === 'done' ? '✓ pronto' :
       st === 'error' ? '✕ erro' :
@@ -359,10 +361,17 @@ export function makeRunView(container, opts) {
   }
   function finish(status) { if (finished) return; finished = true; if (opts.onFinish) opts.onFinish(status); }
 
+  // v4.1: progresso de blocos em lotes (broadcast / artigos) no status do card
+  function onBlockProgress(d) {
+    const c = cards[d.block]; if (!c || c.status !== 'loading') return;
+    const lbl = d.label === 'montando' ? 'montando…' : (d.label || '') + (d.total ? ' · ' + Math.round((d.done / d.total) * 100) + '%' : '');
+    setStatus(c, 'loading', lbl);
+  }
+
   const handlers = {
     onRunStart: onRunStart, onBlockStart: onBlockStart, onBlockDelta: onBlockDelta,
     onBlockDone: onBlockDone, onBlockError: onBlockError, onRunDone: onRunDone,
-    onAgentReviewing: onAgentReviewing, onAgentReview: onAgentReview,
+    onAgentReviewing: onAgentReviewing, onAgentReview: onAgentReview, onBlockProgress: onBlockProgress,
     onRunError: onRunError, onAbort: onAbort, onStreamEnd: onStreamEnd
   };
 
@@ -395,6 +404,7 @@ export function makeRunView(container, opts) {
       onBlockError: function (d) { renderError(ensureCard(d.block), d); },
       onAgentReviewing: function (d) { const c = ensureCard(d.block); setAttempt(c, d.attempt); setStatus(c, 'reviewing'); },
       onAgentReview: function (d) { const c = ensureCard(d.block); setResult(d.block, { review: d, attempt: d.attempt }); showReview(c, d, false); },
+      onBlockProgress: onBlockProgress,
       onRunDone: function (d) { localDone = true; (d.skipped || []).forEach(function (b) { if (cards[b]) renderError(cards[b], { reason: 'dependency_failed' }); }); },
       onRunError: function (d) { if (!localDone && card.status === 'loading') markInterrupted(card); if (d && d.message) toast('Falha: ' + d.message); },
       onAbort: function () { if (card.status === 'loading') markInterrupted(card); },
@@ -702,6 +712,24 @@ function sanitize(b, j, raw, ctx) {
         }).join('');
       }
     }
+    // v4.1 — artigos P1/P2 (Publisher): resumo + prévia recolhível do HTML
+    if ((b === 'p1_posts' || b === 'p2_posts') && Array.isArray(j.posts)) {
+      const totalWords = j.posts.reduce(function (a, p) { return a + (p.word_count || 0); }, 0);
+      let h = '<span class="tag">' + j.posts.length + ' ' + (b === 'p1_posts' ? 'P1' : 'P2') + ' · ' + totalWords.toLocaleString('pt-BR') + ' palavras · prontos pra publicar (botão 🌐 abaixo)</span>';
+      h += j.posts.map(function (p, i) {
+        const pid = ctx.ip.length; ctx.ip.push((p.title || '') + '\n\n' + (p.html || ''));
+        return '<div class="kv post-item"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+          '<b>#' + esc(p.index || (i + 1)) + ' · ' + esc(p.title || '') + '</b>' +
+          '<button class="mini-btn ipcopy" data-ip="' + pid + '">copiar HTML</button></div>' +
+          '<p style="font-size:12px;color:var(--muted);margin-top:4px">' + esc(p.word_count || 0) + ' palavras · slug <span class="pin">' + esc(p.slug || '') + '</span> · kw <span class="pin">' + esc(p.focus_keyword || '') + '</span>' +
+          (p.image_search ? ' · 📷 ' + esc(p.image_search) : '') + '</p>' +
+          (p.meta_description ? '<p style="font-size:12px"><b>Meta:</b> ' + esc(p.meta_description) + '</p>' : '') +
+          (p.tags && p.tags.length ? '<p style="font-size:12px">' + p.tags.map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join(' ') + '</p>' : '') +
+          '<details class="post-preview"><summary>▼ ler artigo</summary><div class="post-html">' + (p.html || '') + '</div></details>' +
+          '</div>';
+      }).join('');
+      return h;
+    }
     if (b === 'audios' && j.audios) {
       return j.audios.map(function (a) {
         const stab = (a.stability != null && a.stability !== '') ? ' · stability ' + esc(a.stability) : '';
@@ -890,6 +918,7 @@ export function cleanText(b, j, raw) {
     if (b === 'page_name' && j.names) return j.names.join('\n');
     if (b === 'fb_images') return 'FOTO DE PERFIL:\n' + ((j.profile && (j.profile.prompt || j.profile)) || '') + '\n\nFOTO DE CAPA:\n' + ((j.cover && (j.cover.prompt || j.cover)) || '') + (j.bio ? '\n\nBIO:\n' + j.bio : '') + (j.intro_post ? '\n\nPOST DE APRESENTAÇÃO:\n' + j.intro_post : '');
     if ((b === 'p1_titles' || b === 'p2_titles') && j.titles) return j.titles.map(function (t, i) { return (i + 1) + '. ' + t; }).join('\n');
+    if ((b === 'p1_posts' || b === 'p2_posts') && Array.isArray(j.posts)) return j.posts.map(function (p) { return '# ' + (p.title || '') + '\n' + (p.html || ''); }).join('\n\n\n');
     if (b === 'meta_copy') return 'TEXTOS:\n' + (j.primary_texts || []).map(function (t, i) { return (i + 1) + '. ' + t; }).join('\n\n') + '\n\nTÍTULOS:\n' + (j.headlines || []).join('\n') + '\n\nDESCRIÇÃO:\n' + (j.description || '');
     if (b === 'meta_onboard') return 'BOAS-VINDAS:\n' + (j.welcome || '') + '\n\nQUICK REPLIES:\n' + (j.quick_replies || []).join('\n') + '\n\nFOLLOW-UP:\n' + (j.followup || '');
     if (b === 'quiz' && j.quizzes) return JSON.stringify(j.quizzes.length === 1 ? j.quizzes[0] : j.quizzes, null, 2);

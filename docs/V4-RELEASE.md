@@ -104,3 +104,34 @@ Base: arquitetura v3.2b (SSE + orquestrador topológico + NEXUS Agent + identida
 - `persona_identity.core` proibido de conter rótulo étnico/nacional; `avoid` vira nota interna (personaIdentityLine não injeta mais "NUNCA altere" como texto de prompt).
 - Capa do FB evoca a região por paisagem/luz/arquitetura, nunca por nome do país ou bandeira.
 - Motivo: prompt de perfil da persona (nicho crédito) rejeitado pelo Google Flow — cartão de crédito + lista de negativos + "Brazilian woman / hint at Brazil".
+
+## 12. v4.1.0 — PUBLISHER WordPress (P1 + P2 completos, publicados no blog)
+Mapeamento e requisitos em `docs/WP-PUBLISHER-ANALYSIS.md`. Dependência externa: **[MBZ] - Mirb Grid 1.4.0+**
+(rota `mirb-grid/v1`, já no Miawzy) e um usuário **Editor** por blog com senha de aplicação.
+
+- **Blocos novos** `p2_posts` (1 artigo por item do grid; deps p2_titles+grid) e `p1_posts` (1 por título; deps
+  p1_titles+quiz+grid). Toggle "📝 Artigos P1 e P2 completos" no passo 4 liga os dois e garante títulos/grid/quiz.
+  Prompts calibrados na anatomia real dos posts de nov/2026 (1.150–1.300 palavras, 1ª pessoa da persona,
+  H2/H3 numerados, tabela no P1, fechamento consciente, regras Meta/AdX-safe, sem país, sem links, sem {{vars}}).
+- **Lotes genéricos**: `BATCH_SPECS` em blocks.js (broadcast 50/lote, artigos 2/lote) e `generateBatched` no
+  orchestrator (substitui o batched só de broadcast); evento SSE `block_progress` → status do card mostra
+  "lote 2/5 · 40%". Artifacts novos: `p1Titles`, `p2Titles`, `gridItems/gridMeta`, `offerwallSummaries`.
+- **postprocess/posts.js**: slug seguro e único, HTML saneado (whitelist de tags, sem atributos/links/img/
+  script, sem blocos wp:/shortcodes), meta ≤155, 6 tags, word_count.
+- **Offerwall** agora gera `qlist` (1 pergunta + 3 opções) — o bloco `quiz-overlay/block` leva isso.
+- **lib/wp.js**: `WPClient` (Basic auth, retry em 5xx, timeout), categorias/tags (find-or-create), upload de
+  mídia por URL (foto via lib/photos → featured), Yoast via `meta` (+ fallback ability), grid via
+  `mirb-grid/v1`; `htmlToBlocks` (Gutenberg), `quizBlock` (serialização de atributos igual ao Gutenberg:
+  `--`→`--`, `<>&"` escapados), `buildP1Content` (grid → offerwall → corpo, app-block antes do 2º H2),
+  `buildP2Content` (HTML clássico). `publishFunnel`: P2s → grid com `item_link={home}/{id}/` → P1s → Yoast;
+  lote falho vira warning, relatório com URLs.
+- **lib/blogs.js**: `DATA_DIR/blogs.json` com senha de aplicação cifrada AES-256-GCM (chave de `BLOGS_SECRET`
+  ou `ACCESS_PASSWORD`); listagem nunca expõe a senha; upsert por url+usuário.
+- **Rotas**: `GET/POST/DELETE /api/blogs`, `POST /api/blogs/:id/test` (papel, capabilities, rota do grid,
+  categorias), `POST /api/publish` (SSE `publish_progress`/`publish_done`/`publish_error`; status default
+  `draft`; `appUrl`/categoria padrão do cadastro).
+- **UI**: aba 🌐 BLOGS (cadastro + teste), botão "🌐 Publicar no blog" na saída quando há artigos, painel
+  Publisher (blog, rascunho/publicar, categoria carregada do blog, URL do app) com log ao vivo, barra e
+  tabela final; o card do grid é atualizado com os links reais após publicar.
+- **Testes**: 158 (wp.js com fetch falso: ordem P2→grid→P1, links por ID, blocos, Yoast, fallback sem rota).
+- Env novo: `BLOGS_SECRET` (opcional).

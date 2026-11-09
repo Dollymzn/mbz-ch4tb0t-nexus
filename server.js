@@ -14,6 +14,8 @@ const { openSSE } = require('./lib/sse');
 const { runOrchestration } = require('./lib/orchestrator');
 const { validateParams } = require('./lib/validate');
 const { readHistory, writeHistory } = require('./lib/history');
+const blogs = require('./lib/blogs');
+const { WPClient, publishFunnel } = require('./lib/wp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -135,6 +137,77 @@ app.delete('/api/history/:id', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
   writeHistory(readHistory().filter(e => e.id !== req.params.id));
   res.json({ ok: true });
+});
+
+// ============================================================
+//  v4.1 PUBLISHER — blogs WordPress + publicação P1/P2
+// ============================================================
+
+// ---- /api/blogs — cadastro (senha de aplicação cifrada no volume; nunca volta) ----
+app.get('/api/blogs', (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  res.json(blogs.listBlogs());
+});
+app.post('/api/blogs', (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  try { res.json({ ok: true, blog: blogs.addBlog(req.body || {}) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.delete('/api/blogs/:id', (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  blogs.removeBlog(req.params.id);
+  res.json({ ok: true });
+});
+
+// ---- /api/blogs/:id/test — conexão, papel, rota do grid, categorias ----
+app.post('/api/blogs/:id/test', async (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  const cred = blogs.getBlogCredentials(req.params.id);
+  if (!cred) return res.status(404).json({ error: 'Blog não encontrado.' });
+  try {
+    const client = new WPClient(cred);
+    const [me, site, cats] = await Promise.all([client.me(), client.siteInfo(), client.categories()]);
+    const gridRest = client.hasGridRest(site.namespaces);
+    const caps = me.capabilities || {};
+    const info = {
+      ok: true, user: me.name, roles: me.roles, site: site.name,
+      can: { posts: !!caps.edit_posts, publish: !!caps.publish_posts, media: !!caps.upload_files, categories: !!caps.manage_categories, grid: gridRest && !!caps.edit_others_posts },
+      gridRest, categories: (cats || []).map(c => ({ id: c.id, name: c.name, count: c.count }))
+    };
+    blogs.markOk(cred.id, { user: me.name, gridRest });
+    res.json(info);
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message });
+  }
+});
+
+// ---- /api/publish — SSE: progresso da publicação P2 → grid → P1 ----
+app.post('/api/publish', async (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  const body = req.body || {};
+  const cred = blogs.getBlogCredentials(body.blogId);
+  if (!cred) return res.status(404).json({ error: 'Blog não encontrado.' });
+  const results = body.results || {};
+  if (!(results.p1_posts && results.p1_posts.posts) && !(results.p2_posts && results.p2_posts.posts)) {
+    return res.status(400).json({ error: 'Nada pra publicar: gere os blocos Artigos P1 / Artigos P2 primeiro.' });
+  }
+  const options = Object.assign({}, body.options || {});
+  options.status = options.status === 'publish' ? 'publish' : 'draft';
+  if (!options.appUrl && cred.appUrl) options.appUrl = cred.appUrl;
+  if (!options.categoryId && !options.categoryName && cred.defaultCategory) options.categoryName = cred.defaultCategory;
+
+  const sse = openSSE(res);
+  try {
+    const report = await publishFunnel({
+      blog: cred, params: body.params || {}, results, options,
+      onProgress: (evt) => sse.send('publish_progress', evt)
+    });
+    await sse.send('publish_done', report);
+  } catch (e) {
+    await sse.send('publish_error', { message: (e && e.message) || 'Erro na publicação.' });
+  } finally {
+    sse.close();
+  }
 });
 
 app.listen(PORT, () => {

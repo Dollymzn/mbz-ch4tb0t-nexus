@@ -1048,3 +1048,61 @@
   .ow-eyebrow{ font-family:var(--f-mono); font-size:var(--fs-2xs); letter-spacing:var(--ls-wider); color:var(--purple-soft); margin:6px 0 2px }
   .offerwall-card h4{ margin-top:6px }
 }
+
+/* ============================================================
+   V4.1 — PUBLISHER (blogs WordPress + publicação P1/P2)
+   ============================================================ */
+@layer components {
+  .publish-panel{
+    margin-top:18px; padding:22px; border-radius:var(--r);
+    background:var(--glass); border:1px solid var(--glass-brd); position:relative; overflow:hidden;
+    box-shadow:var(--sh-2), inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .publish-panel::before{ content:''; position:absolute; inset:0 0 auto 0; height:2px; background:linear-gradient(90deg,var(--cyan),var(--pink),var(--purple)); opacity:.8 }
+  .publish-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px }
+  .publish-title{ font-family:var(--f-head); font-size:var(--fs-xl); margin:4px 0 6px; text-shadow:var(--glow-text-cyan) }
+  .publish-actions{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px }
+  .pub-summary{ font-family:var(--f-mono); font-size:var(--fs-sm); color:var(--muted) }
+  .pub-progress{ margin-top:16px }
+  .pub-bar{ height:6px; border-radius:999px; background:rgba(255,255,255,.06); overflow:hidden; border:1px solid var(--glass-brd) }
+  .pub-bar-fill{ height:100%; width:0; background:linear-gradient(90deg,var(--cyan),var(--pink)); box-shadow:0 0 12px rgba(var(--cyan-rgb)/.6); transition:width var(--dur-3) var(--ease-out) }
+  .pub-log{ margin-top:10px; max-height:260px; overflow:auto; font-family:var(--f-mono); font-size:var(--fs-sm); line-height:1.6; padding:10px 12px; border-radius:var(--rs); background:rgba(0,0,0,.25); border:1px solid var(--glass-brd) }
+  .pub-line a{ color:var(--cyan) }
+  .pub-line.warn{ color:var(--amber) }
+  .pub-line.err{ color:var(--pink) }
+  .pub-line.ok{ color:var(--green); text-shadow:0 0 8px rgba(var(--green-rgb)/.4) }
+  .pub-result{ margin-top:16px }
+  .pub-result h4{ font-family:var(--f-mono); font-size:var(--fs-sm); color:var(--muted); letter-spacing:var(--ls-wide); margin-bottom:8px }
+  .pub-table{ width:100%; border-collapse:collapse; font-size:var(--fs-sm) }
+  .pub-table th,.pub-table td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--glass-brd); vertical-align:top }
+  .pub-table th{ font-family:var(--f-mono); font-size:var(--fs-2xs); letter-spacing:var(--ls-wider); color:var(--muted); text-transform:uppercase }
+  .pub-table a{ color:var(--cyan) }
+  .pub-grid-row td{ background:rgba(var(--purple-rgb)/.08) }
+  .pub-warnings{ margin-top:10px; font-family:var(--f-mono); font-size:var(--fs-sm); color:var(--amber); line-height:1.6 }
+
+  /* aba Blogs */
+  .blog-form{ padding:18px; border-radius:var(--r); background:var(--glass); border:1px solid var(--glass-brd); margin-bottom:18px }
+  .blog-list{ display:flex; flex-direction:column; gap:10px }
+  .blog-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:14px 16px; border-radius:var(--r); background:var(--glass); border:1px solid var(--glass-brd); transition:border-color var(--dur-2), box-shadow var(--dur-2) }
+  .blog-row:hover{ border-color:rgba(var(--cyan-rgb)/.4); box-shadow:var(--glow-cyan) }
+  .blog-info{ display:flex; flex-direction:column; gap:4px; min-width:0 }
+  .blog-info b{ font-family:var(--f-head); font-size:var(--fs-md) }
+  .blog-info small{ color:var(--muted); font-size:var(--fs-sm) }
+  .blog-test-out{ font-family:var(--f-mono); font-size:var(--fs-sm); color:var(--green); margin-top:4px; word-break:break-word }
+  .blog-actions{ display:flex; gap:8px; flex-shrink:0 }
+
+  /* artigos no card */
+  .post-item .post-preview{ margin-top:8px }
+  .post-item summary{ cursor:pointer; font-family:var(--f-mono); font-size:var(--fs-sm); color:var(--cyan) }
+  .post-html{ margin-top:10px; padding:14px 16px; border-radius:var(--rs); background:rgba(255,255,255,.03); border:1px solid var(--glass-brd); max-height:420px; overflow:auto; font-size:var(--fs-md); line-height:1.7 }
+  .post-html h2{ font-size:var(--fs-lg); margin:18px 0 8px; color:var(--text) }
+  .post-html h3{ font-size:var(--fs-md); margin:14px 0 6px; color:var(--cyan) }
+  .post-html p{ margin:0 0 10px }
+  .post-html ul,.post-html ol{ margin:0 0 10px 20px }
+  .post-html table{ width:100%; border-collapse:collapse; margin:10px 0 }
+  .post-html td,.post-html th{ border:1px solid var(--glass-brd); padding:6px 8px; font-size:var(--fs-sm) }
+}
+@media (max-width:760px){
+  .blog-row{ flex-direction:column }
+  .pub-table{ display:block; overflow-x:auto }
+}

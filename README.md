@@ -1,8 +1,17 @@
-# MBZ::CH4TB0T NEXUS v4
+# MBZ::CH4TB0T NEXUS v4.1
 
 Gerador completo de funis de arbitragem digital (Meta Ads -> Chatbot -> Blog AdX) 100% via API do Claude.
 Um único endpoint SSE gera todos os blocos do funil em paralelo, respeitando as dependências entre eles,
 com o texto de cada bloco chegando ao vivo na tela conforme o modelo escreve.
+
+## Novidades da v4.1 — Publisher WordPress
+- **📝 Artigos P1 e P2 completos** (toggle no passo 4): um P2 por item do grid e um P1 por título, ~1.200
+  palavras na voz da persona, gerados em lotes de 2.
+- **🌐 Publicar no blog**: aba BLOGS cadastra cada WordPress (usuário Editor + senha de aplicação, cifrada no
+  volume). O Publisher cria os P2s em rascunho → cria o grid MIRB com os links reais (`/{id}/`) via
+  `mirb-grid/v1` ([MBZ] - Mirb Grid 1.4.0+) → cria os P1s com grid + offerwall no topo → Yoast + imagem
+  destacada. Relatório com URLs e o card do grid atualizado.
+- Detalhes: `docs/WP-PUBLISHER-ANALYSIS.md` e `docs/V4-RELEASE.md` §12.
 
 ## Novidades da v4
 

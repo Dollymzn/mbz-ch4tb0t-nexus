@@ -1,6 +1,6 @@
 {
   "name": "mbz-chatbot-nexus",
-  "version": "4.0.2",
+  "version": "4.1.0",
   "description": "MBZ::CH4TB0T NEXUS — Gerador completo de funis de arbitragem digital via Claude API",
   "main": "server.js",
   "scripts": {

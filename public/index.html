@@ -39,6 +39,7 @@
       <button class="tab active" data-tab="creator"><i>⚡</i> CRIADOR</button>
       <button class="tab" data-tab="optimizer"><i>🔧</i> OTIMIZADOR</button>
       <button class="tab" data-tab="history"><i>📂</i> HISTÓRICO</button>
+      <button class="tab" data-tab="blogs"><i>🌐</i> BLOGS</button>
     </nav>
     <div class="status-cluster">
       <span class="status-dot" id="connDot"></span>
@@ -294,6 +295,11 @@
               </div>
             </div>
           </div>
+
+          <div class="toggle-card">
+            <label class="switch"><input type="checkbox" id="wantPosts"><span class="slider"></span></label>
+            <div class="toggle-info"><b>📝 Artigos P1 e P2 completos (Publisher)</b><span>Um P2 por item do grid + um P1 por título, ~1.200 palavras cada, na voz da persona · depois publica no blog em rascunho</span></div>
+          </div>
         </div>
 
         <!-- STEP 5 -->
@@ -330,6 +336,52 @@
     <div class="output-actions hidden" id="outputActions">
       <button id="saveBtn" class="btn-ghost">💾 Salvar no histórico</button>
       <button id="downloadAll" class="btn-ghost">⬇️ Baixar todos os JSONs</button>
+      <button id="publishBtn" class="btn-primary hidden">🌐 Publicar no blog</button>
+    </div>
+
+    <!-- ===== PUBLISHER (v4.1) ===== -->
+    <div id="publishPanel" class="publish-panel hidden">
+      <div class="publish-head">
+        <div>
+          <div class="step-eyebrow">PUBLISHER · WORDPRESS</div>
+          <h3 class="publish-title">Publicar P1 e P2 no blog</h3>
+          <p class="step-help">Ordem: P2s → grid MIRB com os links reais → P1s com grid + offerwall no topo → Yoast. Tudo em <b>rascunho</b> por padrão.</p>
+        </div>
+        <button id="publishClose" class="mini-btn">✕ fechar</button>
+      </div>
+      <div class="card-grid">
+        <div class="sel-card">
+          <label>Blog</label>
+          <select id="pubBlog"></select>
+          <small id="pubBlogHint">cadastre blogs na aba 🌐 BLOGS</small>
+        </div>
+        <div class="sel-card">
+          <label>Status</label>
+          <select id="pubStatus">
+            <option value="draft" selected>Rascunho (revisar antes)</option>
+            <option value="publish">Publicar direto</option>
+          </select>
+        </div>
+        <div class="sel-card">
+          <label>Categoria</label>
+          <select id="pubCategory"><option value="">(auto pelo nicho)</option></select>
+          <small>carregada do blog ao selecionar</small>
+        </div>
+        <div class="sel-card">
+          <label>URL do app (botão interno)</label>
+          <input type="text" id="pubAppUrl" placeholder="https://play.google.com/store/apps/details?id=…">
+          <small>opcional · nicho de app</small>
+        </div>
+      </div>
+      <div class="publish-actions">
+        <span id="pubSummary" class="pub-summary"></span>
+        <button id="pubGo" class="btn-forge">PUBLICAR ⚡</button>
+      </div>
+      <div id="pubProgress" class="pub-progress hidden">
+        <div class="pub-bar"><div id="pubBarFill" class="pub-bar-fill"></div></div>
+        <div id="pubLog" class="pub-log"></div>
+      </div>
+      <div id="pubResult" class="pub-result hidden"></div>
     </div>
   </section>
 
@@ -405,7 +457,28 @@
     <div id="historyList" class="history-list"></div>
   </section>
 
-  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.0 · <span id="modelFoot"></span></footer>
+  <!-- ============ BLOGS (Publisher v4.1) ============ -->
+  <section id="tab-blogs" class="view hidden">
+    <h2 class="step-title">Blogs WordPress</h2>
+    <p class="step-help">Cada blog entra com um usuário <b>Editor</b> (sugestão: <code>nexus</code>) e uma <b>senha de aplicação</b> (Perfil → Senhas de aplicação). A senha fica cifrada no volume do Railway e nunca volta pro navegador. O grid precisa do plugin <b>[MBZ] - Mirb Grid 1.4.0+</b> no blog.</p>
+    <div class="blog-form">
+      <div class="card-grid">
+        <div class="sel-card"><label>Nome</label><input type="text" id="blogName" placeholder="Miawzy"></div>
+        <div class="sel-card"><label>URL</label><input type="text" id="blogUrl" placeholder="https://blog.miawzy.com"></div>
+        <div class="sel-card"><label>Usuário</label><input type="text" id="blogUser" placeholder="nexus"></div>
+        <div class="sel-card"><label>Senha de aplicação</label><input type="password" id="blogPass" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" autocomplete="new-password"></div>
+        <div class="sel-card"><label>URL do app padrão (opcional)</label><input type="text" id="blogAppUrl" placeholder="https://play.google.com/store/apps/details?id=…"></div>
+        <div class="sel-card"><label>Categoria padrão (opcional)</label><input type="text" id="blogCategory" placeholder="Aplicativos"></div>
+      </div>
+      <div class="publish-actions">
+        <span id="blogFormMsg" class="pub-summary"></span>
+        <button id="blogAdd" class="btn-primary">+ Salvar blog</button>
+      </div>
+    </div>
+    <div id="blogList" class="blog-list"></div>
+  </section>
+
+  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.1 · <span id="modelFoot"></span></footer>
 </div>
 
 <!-- ===== API KEY MODAL ===== -->
