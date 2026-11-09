@@ -180,6 +180,15 @@ export function addBlog(data) {
 export function deleteBlog(id) {
   return fetch('/api/blogs/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() }).then(function (r) { return r.json(); });
 }
+export function getStorage() {
+  return fetch('/api/storage', { headers: authHeaders() }).then(function (r) { return r.json(); });
+}
+export function backupBlogs() {
+  return fetch('/api/blogs/backup', { headers: authHeaders() }).then(function (r) { return r.json(); });
+}
+export function restoreBlogs(entries) {
+  return fetch('/api/blogs/restore', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ entries: entries }) }).then(function (r) { return r.json(); });
+}
 export function testBlog(id) {
   return fetch('/api/blogs/' + encodeURIComponent(id) + '/test', { method: 'POST', headers: authHeaders() }).then(function (r) { return r.json(); });
 }

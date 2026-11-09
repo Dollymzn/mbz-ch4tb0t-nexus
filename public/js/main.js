@@ -7,7 +7,7 @@
 
 import { state, esc, toast, setModel, setUserKey, setAccessPass, resetRun, mergeArtifacts } from './state.js';
 import { initFX, startClock } from './fx.js';
-import { getConfig, auth, getHistory, saveHistory, deleteHistory, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
+import { getConfig, auth, getHistory, saveHistory, deleteHistory, getStorage, backupBlogs, restoreBlogs, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
 import { makeRunView, exportJson } from './render.js';
 import { initWizard, collectParams, selectedBlocks, gotoStep } from './wizard.js';
 import './anim.js'; // efeitos que exigem JS: boot do gate, ripple, View Transitions
@@ -525,12 +525,41 @@ function wireBlogs() {
   };
 }
 
-function loadBlogs() {
+/* ---------- persistência dos blogs (v4.1.1) ----------
+   O Railway recria o container a cada deploy: sem Volume, blogs.json some. Além do aviso,
+   guardamos um backup CIFRADO (senha ilegível sem o BLOGS_SECRET do servidor) no navegador e
+   devolvemos ao servidor se ele acordar vazio. */
+const BLOGS_BACKUP_KEY = 'nexus_blogs_backup_v1';
+function saveBlogsBackup() {
+  backupBlogs().then(function (b) { if (b && Array.isArray(b.entries) && b.entries.length) { try { localStorage.setItem(BLOGS_BACKUP_KEY, JSON.stringify(b)); } catch (e) { /* noop */ } } }).catch(function () {});
+}
+function readBlogsBackup() { try { const b = JSON.parse(localStorage.getItem(BLOGS_BACKUP_KEY) || 'null'); return b && Array.isArray(b.entries) ? b : null; } catch (e) { return null; } }
+function showStorageBanner(st) {
+  const el = $('#storageBanner'); if (!el || !st) return;
+  el.classList.remove('hidden');
+  if (st.persistent) { el.className = 'storage-banner ok'; el.innerHTML = '💾 armazenamento <b>persistente</b> · <span class="pin">' + esc(st.dir) + '</span> (' + esc(st.source === 'railway-volume' ? 'Volume do Railway' : st.source) + ')'; }
+  else { el.className = 'storage-banner warn'; el.innerHTML = '⚠ armazenamento <b>EFÊMERO</b> (<span class="pin">' + esc(st.dir) + '</span>): blogs e histórico somem a cada deploy. No Railway: <b>Settings → Volumes → Add Volume</b> com mount path <code>/data</code> e variável <code>DATA_DIR=/data</code>. Enquanto isso, um backup cifrado fica neste navegador e é restaurado sozinho.'; }
+}
+
+function loadBlogs(afterRestore) {
   const list = $('#blogList'); if (!list) return;
   list.innerHTML = '<p class="step-help">carregando…</p>';
+  getStorage().then(showStorageBanner).catch(function () {});
   getBlogs().then(function (arr) {
     blogsCache = Array.isArray(arr) ? arr : [];
-    if (!blogsCache.length) { list.innerHTML = '<p class="step-help">Nenhum blog cadastrado ainda.</p>'; return; }
+    if (!blogsCache.length) {
+      const bk = readBlogsBackup();
+      if (bk && !afterRestore) {
+        list.innerHTML = '<p class="step-help">♻ servidor sem blogs — restaurando do backup local…</p>';
+        return restoreBlogs(bk.entries).then(function (r) {
+          if (r && r.added) toast('♻ ' + r.added + ' blog(s) restaurado(s) do backup local');
+          else if (r && r.invalid) toast('⚠ backup local não pôde ser restaurado (BLOGS_SECRET mudou?) — cadastre o blog de novo');
+          loadBlogs(true);
+        });
+      }
+      list.innerHTML = '<p class="step-help">Nenhum blog cadastrado ainda.</p>'; return;
+    }
+    saveBlogsBackup();
     list.innerHTML = blogsCache.map(function (b) {
       const ok = b.last_ok ? ('✓ ' + esc(b.last_ok.user || '') + (b.last_ok.gridRest ? ' · grid REST' : ' · ⚠ sem grid REST') + ' · ' + esc(String(b.last_ok.at || '').slice(0, 16).replace('T', ' '))) : 'nunca testado';
       return '<div class="blog-row" data-id="' + esc(b.id) + '">' +
@@ -552,7 +581,7 @@ function loadBlogs() {
       btn.onclick = function () {
         const row = btn.closest('.blog-row');
         if (!confirm('Remover este blog do Nexus? (não apaga nada no WordPress)')) return;
-        deleteBlog(row.dataset.id).then(loadBlogs);
+        deleteBlog(row.dataset.id).then(function () { loadBlogs(); });
       };
     });
   });

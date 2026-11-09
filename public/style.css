@@ -1114,3 +1114,9 @@
 .niche-app a{color:var(--cyan,#19e3ff);word-break:break-all}
 .niche-app small.muted{opacity:.6}
 .publish-panel .sel-card label.switch-inline{display:flex;margin-top:8px;font-size:12px}
+
+/* storage banner (v4.1.1) */
+.storage-banner{margin:0 0 14px;padding:10px 14px;border:1px solid;border-radius:8px;font-size:13px;line-height:1.5}
+.storage-banner.ok{border-color:rgba(var(--cyan-rgb)/.35);background:rgba(var(--cyan-rgb)/.06)}
+.storage-banner.warn{border-color:var(--amber,#ffb020);background:rgba(255,176,32,.08);color:var(--amber,#ffb020)}
+.storage-banner code{font-family:var(--mono,monospace);background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px}

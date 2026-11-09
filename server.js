@@ -15,6 +15,7 @@ const { runOrchestration } = require('./lib/orchestrator');
 const { validateParams } = require('./lib/validate');
 const { readHistory, writeHistory } = require('./lib/history');
 const blogs = require('./lib/blogs');
+const { storageInfo } = require('./lib/datadir');
 const { WPClient, publishFunnel } = require('./lib/wp');
 
 const app = express();
@@ -148,6 +149,20 @@ app.get('/api/blogs', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
   res.json(blogs.listBlogs());
 });
+// ---- armazenamento: persistente (volume) ou efêmero? + backup/restore dos blogs ----
+app.get('/api/storage', (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  res.json(Object.assign(storageInfo(), { blogs: blogs.listBlogs().length }));
+});
+app.get('/api/blogs/backup', (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  res.json({ v: 1, at: new Date().toISOString(), entries: blogs.exportBackup() });
+});
+app.post('/api/blogs/restore', (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  try { res.json(Object.assign({ ok: true }, blogs.importBackup((req.body || {}).entries))); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
 app.post('/api/blogs', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
   try { res.json({ ok: true, blog: blogs.addBlog(req.body || {}) }); }
@@ -213,5 +228,7 @@ app.post('/api/publish', async (req, res) => {
 app.listen(PORT, () => {
   const photoKeys = ['PEXELS_API_KEY', 'PIXABAY_API_KEY', 'UNSPLASH_ACCESS_KEY'].filter(k => process.env[k]);
   console.log(`MBZ::CH4TB0T NEXUS v4 ONLINE -> port ${PORT}`);
+  const st = storageInfo();
+  console.log(`DATA_DIR: ${st.dir} (${st.source}) ${st.persistent ? '' : '— ⚠ EFÊMERO: monte um Volume em /data e defina DATA_DIR=/data'}`);
   console.log(`Server key: ${SERVER_API_KEY ? 'YES' : 'NO'} | Password: ${ACCESS_PASSWORD ? 'YES' : 'NO'} | MAX_CONCURRENCY: ${process.env.MAX_CONCURRENCY || 3} | Fotos: ${photoKeys.length ? photoKeys.join('+') : 'NENHUMA key (grid sem fotos reais)'}`);
 });

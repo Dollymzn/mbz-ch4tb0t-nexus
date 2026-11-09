@@ -168,3 +168,16 @@ Mapeamento e requisitos em `docs/WP-PUBLISHER-ANALYSIS.md`. Dependência externa
 ### Testes
 - `test/wp.test.js`: bloco cardlink (atributos, externo, marcador em P1/P2, fallback 4º h2, limpeza sem bloco), fluxo
   completo com `next` (2 PUTs, 100→101→100) e `exit`/`none`/sem appUrl. 160 testes verdes.
+
+### Persistência dos blogs (fix do "sumiu o blog no deploy")
+- Causa: o Railway recria o container a cada deploy; sem Volume, `DATA_DIR` caía em `./data` (efêmero) e
+  `blogs.json`/`history.json` eram perdidos.
+- `lib/datadir.js` resolve a pasta: `DATA_DIR` → `RAILWAY_VOLUME_MOUNT_PATH` (o Railway seta sozinho quando há
+  Volume anexado) → `./data` (marcado como efêmero quando `RAILWAY_ENVIRONMENT` existe). Log de boot avisa.
+- `GET /api/storage` → `{dir, source, persistent, blogs}`; banner na aba Blogs (verde = persistente / âmbar =
+  efêmero com o passo a passo do Volume).
+- Backup cifrado no navegador: `GET /api/blogs/backup` devolve as entradas com a senha AINDA cifrada (só decifra com o
+  mesmo `BLOGS_SECRET`/`ACCESS_PASSWORD` do servidor); o front guarda em `localStorage` toda vez que lista blogs e, se o
+  servidor acordar sem nenhum, chama `POST /api/blogs/restore` (upsert por url+user; entradas que não decifram são
+  ignoradas e o usuário é avisado de que o segredo mudou).
+- **Setup definitivo no Railway:** Settings → Volumes → Add Volume, mount path `/data`; variável `DATA_DIR=/data`.

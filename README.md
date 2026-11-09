@@ -9,7 +9,9 @@ com o texto de cada bloco chegando ao vivo na tela conforme o modelo escreve.
   e pré-preenche a URL do bloco de aplicativo no painel de publicação.
 - **CardLink** no meio dos P1 e P2 (plugin CardLink): P1 → 1º artigo do grid ou link de saída; P2 → próxima P2
   (circular) ou link de saída; ou nenhum. Imagem = featured do destino.
-- App-block **opcional nos P1** (switch), **sempre nos P2**. Detalhes em `docs/V4-RELEASE.md` §13.
+- App-block **opcional nos P1** (switch), **sempre nos P2**.
+- **Blogs persistentes**: detecta o Volume do Railway sozinho, avisa quando o armazenamento é efêmero e mantém um
+  backup cifrado no navegador que restaura os blogs se o servidor subir vazio. Detalhes em `docs/V4-RELEASE.md` §13.
 
 ## Novidades da v4.1 — Publisher WordPress
 - **📝 Artigos P1 e P2 completos** (toggle no passo 4): um P2 por item do grid e um P1 por título, ~1.200
