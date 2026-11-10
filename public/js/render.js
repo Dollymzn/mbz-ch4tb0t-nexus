@@ -25,7 +25,7 @@ export const BLOCKS = [
   { id: 'p2_titles',       name: 'Títulos P2',        hint: 'texto',             kind: 'text',          def: true },
   { id: 'quiz',            name: 'Quiz Overlays',     hint: 'texto',             kind: 'text',          def: true },
   { id: 'meta_copy',       name: 'Copy Meta',         hint: 'texto',             kind: 'text',          def: true },
-  { id: 'meta_onboard',    name: 'Onboard Meta',      hint: 'texto',             kind: 'text',          def: true },
+  { id: 'meta_onboard',    name: 'Entrada Meta (CTM)', hint: 'FAQ + JSON quick replies', kind: 'text',   def: true },
   { id: 'image_prompts',   name: 'Prompts de Imagem', hint: 'fluxo',             kind: 'text',          def: false, needsToggle: 'imagePrompts' },
   { id: 'creatives_prompt',name: 'Criativos',         hint: 'prompts',           kind: 'text',          def: false, needsToggle: 'wantCreatives' },
   { id: 'audios',          name: 'Áudios v4',         hint: 'ElevenLabs v4',     kind: 'text',          def: false, needsToggle: 'wantAudios' },
@@ -46,7 +46,7 @@ BLABEL.creative_analysis = 'Análise de Criativos';
 // dependentes: quando a CHAVE é regenerada, os VALORES ficam "desatualizados"
 const DEPENDENTS = {
   grid_preview: ['grid'],
-  onboard: ['image_prompts'],
+  onboard: ['image_prompts', 'meta_onboard'],
   sequence: ['image_prompts'],
   // v3.2a: a identidade visual da persona é injetada em todo prompt de imagem/vídeo
   persona_identity: ['fb_images', 'image_prompts', 'creatives_prompt', 'video_prompts'],
@@ -58,6 +58,7 @@ const DEP_OF = {
   grid: 'grid_preview',
   fb_images: 'identidade visual',
   image_prompts: 'onboard/sequência/identidade',
+  meta_onboard: 'onboard',
   audios: 'criativos',
   creatives_prompt: 'identidade visual',
   video_prompts: 'criativos/áudios/identidade'
@@ -638,10 +639,22 @@ function sanitize(b, j, raw, ctx) {
       return h;
     }
     if (b === 'meta_onboard') {
-      let h = '';
-      if (j.welcome) { h += '<h4>Boas-vindas</h4><p>' + esc(j.welcome) + '</p>'; }
-      if (j.quick_replies) { h += '<h4>Quick replies</h4>' + ulist(j.quick_replies); }
-      if (j.followup) { h += '<h4>Follow-up 24h</h4><p>' + esc(j.followup) + '</p>'; }
+      // v4.1.1 — dois entregáveis: texto pro editor visual (Saudação + Perguntas frequentes) e JSON de quick replies
+      const faq = Array.isArray(j.faq) ? j.faq : [];
+      const qr = Array.isArray(j.quick_replies) ? j.quick_replies : [];
+      const faqTxt = 'SAUDAÇÃO:\n' + (j.greeting || '') + '\n\nPERGUNTAS FREQUENTES (deixe a resposta em branco — o ChatDrink responde):\n' + faq.map(function (f, i) { return (i + 1) + '. ' + (typeof f === 'string' ? f : f.question); }).join('\n') + (j.followup ? '\n\nFOLLOW-UP 24h:\n' + j.followup : '');
+      const mj = j.meta_json || { message: { text: j.greeting || '', quick_replies: qr.map(function (q) { return { content_type: 'text', title: q.title || q, payload: q.payload || '' }; }) } };
+      const t1 = ctx.ip.length; ctx.ip.push(faqTxt);
+      const t2 = ctx.ip.length; ctx.ip.push(JSON.stringify(mj, null, 2));
+      let h = '<div class="kv meta-entry"><div class="meta-head"><span class="tag">A · EDITOR VISUAL — Saudação + Perguntas frequentes</span><button class="mini-btn ipcopy" data-ip="' + t1 + '">copiar texto</button></div>' +
+        '<p class="meta-greet">' + esc(j.greeting || '') + '</p>' +
+        '<ol class="meta-faq">' + faq.map(function (f) { const q = typeof f === 'string' ? f : f.question; return '<li>' + esc(q) + ' <span class="pin">' + esc([...(q || '')].length) + '/80</span>' + (f.payload ? ' <span class="pin voice-id">' + esc(f.payload) + '</span>' : '') + '</li>'; }).join('') + '</ol>' +
+        '<small class="muted">cole no anúncio: Saudação = texto · Ações do cliente = Perguntas frequentes (5), resposta automática em branco</small></div>';
+      h += '<div class="kv meta-entry"><div class="meta-head"><span class="tag">B · CAMPO JSON — quick replies</span><button class="mini-btn ipcopy" data-ip="' + t2 + '">copiar JSON</button></div>' +
+        '<div class="meta-qr">' + qr.map(function (q) { const t = q.title || q; return '<span class="qr-chip">' + esc(t) + '<small>' + esc([...(t || '')].length) + '/20</small></span>'; }).join('') + '</div>' +
+        '<details><summary>ver JSON</summary><pre class="post-html">' + esc(JSON.stringify(mj, null, 2)) + '</pre></details>' +
+        '<small class="muted">payloads ONB_&lt;nicho&gt;_&lt;rota&gt; — no ChatDrink, casar a rota pelo payload ou pelo texto da quick reply</small></div>';
+      if (j.followup) h += '<div class="kv"><h4>Follow-up 24h</h4><p>' + esc(j.followup) + '</p></div>';
       return h;
     }
     if (b === 'quiz' && j.quizzes) {
@@ -967,7 +980,7 @@ export function cleanText(b, j, raw) {
     if ((b === 'p1_titles' || b === 'p2_titles') && j.titles) return j.titles.map(function (t, i) { return (i + 1) + '. ' + t; }).join('\n');
     if ((b === 'p1_posts' || b === 'p2_posts') && Array.isArray(j.posts)) return j.posts.map(function (p) { return '# ' + (p.title || '') + '\n' + (p.html || ''); }).join('\n\n\n');
     if (b === 'meta_copy') return 'TEXTOS:\n' + (j.primary_texts || []).map(function (t, i) { return (i + 1) + '. ' + t; }).join('\n\n') + '\n\nTÍTULOS:\n' + (j.headlines || []).join('\n') + '\n\nDESCRIÇÃO:\n' + (j.description || '');
-    if (b === 'meta_onboard') return 'BOAS-VINDAS:\n' + (j.welcome || '') + '\n\nQUICK REPLIES:\n' + (j.quick_replies || []).join('\n') + '\n\nFOLLOW-UP:\n' + (j.followup || '');
+    if (b === 'meta_onboard') return 'SAUDAÇÃO:\n' + (j.greeting || j.welcome || '') + '\n\nPERGUNTAS FREQUENTES:\n' + (j.faq || []).map(function (f, i) { return (i + 1) + '. ' + (typeof f === 'string' ? f : f.question); }).join('\n') + '\n\nJSON QUICK REPLIES:\n' + JSON.stringify(j.meta_json || {}, null, 2) + (j.followup ? '\n\nFOLLOW-UP 24h:\n' + j.followup : '');
     if (b === 'quiz' && j.quizzes) return JSON.stringify(j.quizzes.length === 1 ? j.quizzes[0] : j.quizzes, null, 2);
     if (b === 'creatives_prompt' && j.prompt) return j.prompt;
     if (b === 'creatives_prompt' && j.prompts) return j.prompts.map(function (p) { return '#' + p.index + ' ' + (p.headline || '') + '\n' + p.prompt + '\nCTA: ' + (p.cta || ''); }).join('\n\n');

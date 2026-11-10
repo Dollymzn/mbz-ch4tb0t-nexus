@@ -39,8 +39,8 @@ test('grafo de dependências — audios depende de creatives_prompt', () => {
 });
 
 test('grafo de dependências — blocos independentes não têm deps', () => {
-  // v3.2a: fb_images saiu da lista — agora depende (soft) de persona_identity.
-  const independentes = ['page_name', 'comment', 'p1_titles', 'p2_titles', 'quiz', 'meta_copy', 'meta_onboard', 'optimize', 'persona_identity'];
+  // v3.2a: fb_images saiu da lista — agora depende (soft) de persona_identity. v4.1.1: meta_onboard depende de onboard.
+  const independentes = ['page_name', 'comment', 'p1_titles', 'p2_titles', 'quiz', 'meta_copy', 'optimize', 'persona_identity'];
   independentes.forEach(b => {
     assert.deepEqual(BLOCK_META[b].deps, [], `"${b}" deveria ser independente (sem deps)`);
   });
@@ -190,4 +190,29 @@ test('v4.1.1 — áudios: catálogo ElevenLabs real no prompt e postprocess norm
   assert.equal(out.audios[0].voice_id, '5EtawPduB139avoMLQgH');
   assert.equal(out.audios[1].voice_id, 'cgSgspJ2msm6clMCkdW9', 'voz desconhecida cai na principal');
   assert.equal(out.audios[2].voice, 'Ana Alice - Friendly & Clear');
+});
+
+test('v4.1.1 — Entrada Meta (CTM): prompt usa ganchos do onboard; postprocess aplica limites da Meta e monta o JSON de quick replies', () => {
+  const fix = require('../lib/postprocess/meta_onboard');
+  const pr = buildBlockPrompt('meta_onboard', { niche: 'Carta Secreta', campaignLang: 'es-ES', onboardHooks: [{ route: 1, title: 'Alguien te dejó una carta' }] });
+  assert.ok(pr.includes('rota 1: "Alguien te dejó una carta"') && pr.includes('ONB_CARTA_SECRETA_1') && pr.includes('{{user_first_name}}'));
+  const out = fix({ greeting: 'g'.repeat(320), faq: [{ route: 1, question: 'q'.repeat(90) }], quick_replies: [{ route: 1, title: '💌 Abrir mi carta secreta ya' }], followup: 'f' }, { niche: 'Carta Secreta' });
+  assert.equal(out.greeting.length <= 300, true);
+  assert.ok([...out.faq[0].question].length <= 80 && out.faq[0].payload === 'ONB_CARTA_SECRETA_1');
+  assert.ok([...out.quick_replies[0].title].length <= 20);
+  assert.deepEqual(Object.keys(out.meta_json.message), ['text', 'quick_replies']);
+  assert.equal(out.meta_json.message.quick_replies[0].content_type, 'text');
+  assert.ok(out._warnings.length >= 3);
+  // artifacts do onboard → onboardHooks
+  const art = BLOCK_META.onboard.artifacts({ routes: [{ interactions: [{ type: 'random' }] }, { interactions: [{ type: 'menu', config: { cards: [{ title: 'Gancho 1' }] } }] }, { interactions: [{ type: 'botoes', config: { title: 'Gancho 2' } }] }] });
+  assert.deepEqual(art.onboardHooks, [{ route: 1, title: 'Gancho 1' }, { route: 2, title: 'Gancho 2' }]);
+});
+
+test('v4.1.1 — títulos compactos: prompts pedem ≤60/≤55 e o postprocess avisa quando estoura', () => {
+  const t = require('../lib/postprocess/titles');
+  assert.ok(buildBlockPrompt('p1_titles', { numP1: 2, contentLang: 'pt-BR', currency: 'USD' }).includes('no maximo 60 caracteres'));
+  assert.ok(buildBlockPrompt('p2_titles', { gridCols: 2, gridRows: 2, contentLang: 'pt-BR', currency: 'USD' }).includes('no maximo 55 caracteres'));
+  const out = t.p1({ titles: ['curto', 'x'.repeat(70) + '...'] });
+  assert.equal(out.titles[1].length, 70);
+  assert.equal(out._warnings.length, 1);
 });

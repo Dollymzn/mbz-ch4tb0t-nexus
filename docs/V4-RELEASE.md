@@ -218,3 +218,20 @@ critério novo, sem saber o que já tinha sido pedido.
   preenchido; warning por item).
 - Card de áudios mostra a voz da persona com o id (selecionável pra copiar) e o id em cada áudio; o "copiar" leva
   nome + id.
+
+## 16. v4.1.1 — Entrada Meta (CTM) + títulos compactos
+**Entrada Meta (bloco `meta_onboard`, agora dependente do `onboard`)** — o que a pessoa vê ao tocar no anúncio
+Click-to-Messenger, nos dois formatos que a Meta aceita (testados no Ads Manager → Conversas):
+- **A · Editor visual** "Saudação + Perguntas frequentes": saudação ≤300 chars com `{{user_first_name}}` + 5 perguntas
+  na voz do usuário (≤80 chars, emoji) — resposta automática fica em branco, o ChatDrink responde. Botão "copiar texto".
+- **B · Campo JSON**: `{"message":{"text":<saudação>,"quick_replies":[{content_type:"text",title≤20,payload}]}}` —
+  o único formato de perguntas que o campo JSON renderiza sem link (ice_breakers flat/locale e button web_url não
+  servem). Botão "copiar JSON".
+- Cada pergunta/quick reply aponta pra uma rota do onboard (artifact novo `onboardHooks` = títulos dos cards por rota);
+  payload `ONB_<NICHO>_<rota>` (nicho sem acento, ≤2 palavras) pra casar no ChatDrink por payload ou texto.
+- `postprocess/meta_onboard.js` aplica os limites (300/80/20, máx 5) com aviso no card e monta o `meta_json` pronto.
+  Formato antigo (`welcome` + strings) é convertido.
+
+**Títulos compactos** — P1 ≤60 chars/9 palavras, P2 ≤55/8 (regra no prompt com exemplo de tamanho); artigos
+compactam o título se vier longo; `postprocess/titles.js` normaliza espaços/reticências e avisa no card quando estoura
+(sem cortar cego — corte estraga o gancho).
