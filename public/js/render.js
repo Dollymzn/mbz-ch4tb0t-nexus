@@ -354,6 +354,7 @@ export function makeRunView(container, opts) {
     storeResult(d);
     renderDone(ensureCard(d.block), d);
     showCost(ensureCard(d.block), d);
+    if ((d.block === 'audios' || d.block === 'meta_copy') && cards.creatives_prompt && cards.creatives_prompt.json) refreshFramePanel(cards.creatives_prompt);
     if (d.cost != null) { const r = state.results[d.block]; if (r) { r.cost = d.cost; r.usage = d.usage; } }
     (DEPENDENTS[d.block] || []).forEach(function (dep) {
       const c = cards[dep];
@@ -1010,14 +1011,21 @@ function framePanelHtml(j) {
     (hasKey ? '<button class="mini-btn frame-go" type="button">🚀 criar no Frame</button>' : '<small>🔑 cadastre sua chave do Frame no chip do usuário (header)</small>') + '</div>' +
     '<div class="frame-opts">' +
       '<label>formato <select class="frame-fmt"><option value="post">post 1080×1080</option><option value="story">story 1080×1920</option><option value="retrato">retrato 1080×1350</option><option value="link">link 1200×628</option></select></label>' +
-      '<label>quantos <input type="number" class="frame-n" min="1" max="14" value="' + Math.min(n, 7) + '"></label>' +
+      '<label>quantos <input type="number" class="frame-n" min="1" max="' + Math.max(1, n) + '" value="' + n + '"></label>' +
       '<label>idiomas <input type="text" class="frame-langs" value="' + esc(lang) + '" placeholder="pt-BR, es, en (até 5)"></label>' +
-      '<label class="switch-inline"><input type="checkbox" class="frame-narr"' + (audios ? ' checked' : '') + (audios ? '' : ' disabled') + '><span class="slider"></span> narração' + (voice ? ' (' + esc(voice.name) + ')' : audios ? '' : ' (gere o bloco Áudios)') + '</label>' +
+      '<label class="switch-inline" title="usa a voz principal e os roteiros do bloco Áudios"><input type="checkbox" class="frame-narr"' + (audios ? ' checked' : '') + '><span class="slider"></span> <span class="frame-narr-label">narração' + (voice ? ' (' + esc(voice.name) + ')' : audios ? '' : ' — gere o bloco Áudios') + '</span></label>' +
+      '<label title="opcional: id ou link de um design SEU com 1 página (fundo + título + CTA) — vira o molde sem gastar IA no layout">molde <input type="text" class="frame-base" placeholder="id/link de um design seu (opcional)"></label>' +
+      '<label class="switch-inline" title="ligado: um design só, uma página por criativo (narração 1 roteiro por página). desligado: um design por criativo"><input type="checkbox" class="frame-single" checked><span class="slider"></span> um design com todas as páginas</label>' +
       '<label class="switch-inline"><input type="checkbox" class="frame-studio"><span class="slider"></span> mandar pro Creative Studio</label>' +
     '</div>' +
     '<div class="frame-log hidden"></div><div class="frame-out"></div>' +
     '<small class="muted">usa os prompts deste bloco + headlines da Copy Meta (se gerada) + CTA no idioma; cada idioma extra vira cópia traduzida. Conta na SUA cota do Frame.</small>' +
   '</div>';
+}
+function refreshFramePanel(card) {
+  const old = card.bodyEl.querySelector('.frame-panel'); if (!old) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = framePanelHtml(card.json || {});
+  old.replaceWith(tmp.firstElementChild); wireFramePanel(card);
 }
 export function wireFramePanel(card) {
   const panel = card.bodyEl.querySelector('.frame-panel'); if (!panel) return;
@@ -1025,14 +1033,16 @@ export function wireFramePanel(card) {
   go.onclick = function () {
     const j = card.json || {}; const prompts = j.prompts || [];
     const fmt = panel.querySelector('.frame-fmt').value;
-    const n = Math.max(1, Math.min(14, parseInt(panel.querySelector('.frame-n').value, 10) || prompts.length));
+    const n = Math.max(1, Math.min(prompts.length, parseInt(panel.querySelector('.frame-n').value, 10) || prompts.length));
     const langs = panel.querySelector('.frame-langs').value.split(/[,\s]+/).filter(Boolean);
     const copy = state.results.meta_copy && state.results.meta_copy.json;
     const audios = state.results.audios && state.results.audios.json;
-    const wantNarr = panel.querySelector('.frame-narr').checked && audios;
+    const wantNarr = panel.querySelector('.frame-narr').checked;
+    if (wantNarr && !audios) { toast('Narração precisa do bloco Áudios — gere ele (ou desligue a narração).'); return; }
     const items = buildFrameItems(prompts.slice(0, n), copy && copy.headlines, langs[0] || state.params.campaignLang, fmt);
     if (!items.length) { toast('Sem prompts pra enviar.'); return; }
-    const payload = { items: items, idiomas: langs, creativeStudio: panel.querySelector('.frame-studio').checked };
+    const baseRaw = panel.querySelector('.frame-base').value.trim(); const baseM = baseRaw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    const payload = { items: items, idiomas: langs, creativeStudio: panel.querySelector('.frame-studio').checked, single: panel.querySelector('.frame-single').checked, nome: (state.params.pageName || state.params.niche || 'NEXUS') + ' — criativos', baseDesign: baseM ? baseM[0] : null };
     if (wantNarr) payload.narracao = { voz: audios.voice_main && audios.voice_main.id, modelo: 'eleven_v4', roteiros: (audios.audios || []).map(function (a) { return a.script; }) };
     const log = panel.querySelector('.frame-log'); const out = panel.querySelector('.frame-out');
     log.classList.remove('hidden'); log.innerHTML = ''; out.innerHTML = ''; go.disabled = true; go.textContent = '⏳ criando…';
@@ -1041,9 +1051,14 @@ export function wireFramePanel(card) {
     frameSendStream(payload, {
       onFrameProgress: function (e) {
         if (e.step === 'lote') line('📦 lote ' + e.lote + '/' + e.lotes + ' (' + e.n + ' criativos) — o Frame gera fundo + textos, pode levar minutos…');
-        else if (e.step === 'design') line('✅ design <a href="' + esc(e.design.link) + '" target="_blank" rel="noopener">' + esc(e.design.nome || e.design.id.slice(0, 8)) + '</a>');
-        else if (e.step === 'narrar') line('🎙 narrando ' + e.i + '/' + e.n);
-        else if (e.step === 'studio') line('📤 ' + e.n + ' designs na fila do Creative Studio (abra o Frame → Exportar agora)');
+        else if (e.step === 'molde') line('🧩 ' + esc(e.message));
+        else if (e.step === 'imagem') line('🖼 imagem ' + e.i + '/' + e.n + '…');
+        else if (e.step === 'montar') line('📐 montando o design com ' + e.n + ' páginas…');
+        else if (e.step === 'traduzir') line('🌐 traduzindo pra ' + esc((e.idiomas || []).join(', ')) + '…');
+        else if (e.step === 'retry') line('⏳ Frame ocupado (' + esc(String(e.message).slice(0, 70)) + ') — tentando de novo em ' + Math.round(e.wait / 1000) + 's');
+        else if (e.step === 'design') line('✅ ' + (e.design.papel === 'molde' ? 'molde' : e.design.papel === 'traducao' ? 'tradução' : 'design') + ' <a href="' + esc(e.design.link) + '" target="_blank" rel="noopener">' + esc(e.design.nome || e.design.id.slice(0, 8)) + '</a>' + (e.design.paginas ? ' · ' + e.design.paginas + ' páginas' : ''));
+        else if (e.step === 'narrar') line('🎙 narrando' + (e.paginas ? ' ' + e.paginas + ' páginas (1 chamada)' : ' ' + e.i + '/' + e.n));
+        else if (e.step === 'studio') line('📤 ' + e.n + ' design(s) na fila do Creative Studio — cada página vira 1 MP4. Abra o Frame (Início) e clique "Exportar agora" com a aba visível até terminar.');
         else if (e.step === 'warning') line('⚠ ' + esc(e.message));
       },
       onFrameDone: function (d) {
@@ -1071,7 +1086,7 @@ function buildFrameItems(prompts, headlines, lang, fmt) {
       h ? 'HEADLINE text (exact, editable, bold, high contrast, max 2 lines): "' + h + '"' : '',
       'CTA button text (exact): "' + cta + '"',
       'Leave clean space for the headline; no logos, no brand names, no country references, no payment cards, no nudity.'].filter(Boolean).join('\n');
-    return { briefing: brief.slice(0, 4000), formato: fmt, quantidade: 1, foto: true };
+    return { briefing: brief.slice(0, 4000), formato: fmt, quantidade: 1, foto: true, scene: scene, headline: h, cta: cta };
   }).filter(Boolean);
 }
 

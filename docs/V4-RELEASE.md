@@ -312,3 +312,26 @@ compactam o título se vier longo; `postprocess/titles.js` normaliza espaços/re
   `/api/frame/send` ponta a ponta: 2 lotes, 9 narrações, Creative Studio, eventos). `server.js` exporta o app e respeita
   `NEXUS_NO_LISTEN=1` pra testes. **Bug corrigido de tabela**: `sse.send` é assíncrono — o último evento precisa de
   `await` antes de `close()`.
+
+### v4.3.1 — um design com N páginas (padrão)
+- Switch **"um design com todas as páginas"** (ligado por padrão). Fluxo: item 1 → `frame_criar_designs` (molde com fundo +
+  textos editáveis) → `frame_ver_design` (índices do headline/CTA casados pelo texto; fallback maior/menor) → cenas 2..N →
+  `frame_gerar_imagem` (prompt + "empty space for a headline, no text") → `frame_criar_de_modelo` com `origem.design` =
+  molde e `paginas` (página 1 do molde N×, cada uma com imagem + headline/CTA trocados) → design final com N páginas →
+  `frame_narrar` com **um roteiro por página em uma chamada** → idiomas extras via `frame_traduzir_design` (cópia por
+  idioma, narração traduzida junto) → Creative Studio (final + traduções; o molde fica fora).
+- Relatório: molde (link, pra apagar se quiser), design final (N páginas, 🎙), traduções. `avisos` do Frame viram warnings.
+- Desligado = v4.3.0 (um design por criativo, lotes de 7).
+
+### v4.3.2 — ajustes do FRAME-API-GUIA (testes reais do Frame)
+- `frameCall` com **retry/backoff** (até 8×) nos erros transitórios: "já tem 2 trabalhos do Frame rodando", "Muitas chamadas… 2 s",
+  "sala ao vivo", 429. Log mostra ⏳ a cada tentativa.
+- Imagens **2 por vez** (limite de trabalhos simultâneos do Frame); `gerar_imagem` lido como `imagem.id`.
+- **Molde existente**: campo "molde" no painel (id/link de um design seu com fundo + título + CTA) → pula o
+  `criar_designs` (zero IA no layout), gera imagem pra todas as páginas e monta por `criar_de_modelo`.
+- Índices de texto: match pelo texto; sem match → convenção 1 = título, 2 = CTA; senão maior/menor.
+- Sufixo nos fundos: "no text anywhere in the image, no letters, no logos, no watermark".
+- Narração continua **1 roteiro por página** (decisão do Teteu — variedade > custo); modelo padrão `eleven_v4`; o bloco
+  Áudios agora pede roteiros de 15-20 s com **tags de emoção entre colchetes**.
+- Tradução em grupos de 5 idiomas (até 11 no campo); `avisos` da tradução viram warnings.
+- Studio: aviso de que a exportação roda no navegador ("Exportar agora" com a aba visível). Chave expira após 90 dias sem uso.
