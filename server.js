@@ -7,7 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const {
-  PERSONAS, LANGUAGES, CURRENCIES, COUNTRIES, CREATIVE_PLATFORMS, CREATIVE_SIZES,
+  PERSONAS, PERSONA_GROUPS, LANGUAGES, CURRENCIES, COUNTRIES, CREATIVE_PLATFORMS, CREATIVE_SIZES,
   buildSystemPrompt
 } = require('./prompts');
 const { openSSE } = require('./lib/sse');
@@ -16,6 +16,7 @@ const { validateParams } = require('./lib/validate');
 const { readHistory, writeHistory } = require('./lib/history');
 const blogs = require('./lib/blogs');
 const { storageInfo } = require('./lib/datadir');
+const users = require('./lib/users');
 const { WPClient, publishFunnel } = require('./lib/wp');
 
 const app = express();
@@ -49,40 +50,70 @@ function resolveKey(req) {
   const h = req.get('x-user-key');
   return h && h.trim() ? h.trim() : null;
 }
-function checkPassword(req) {
-  if (!ACCESS_PASSWORD) return true;
-  return constantTimeEqual(req.get('x-access-pass'), ACCESS_PASSWORD);
+// v4.2 — sessão por token (header x-access-pass carrega o token de sessão). Define req.user.
+function authUser(req) {
+  if (req.user !== undefined) return req.user;
+  const u = users.verifyToken(req.get('x-access-pass') || (req.query && req.query.token) || '');
+  req.user = u || null;
+  return req.user;
 }
+function checkPassword(req) { return !!authUser(req); }
+function isMaster(req) { const u = authUser(req); return !!(u && u.role === 'master'); }
+function canSee(req, ownerId) { const u = authUser(req); return !!u && (u.role === 'master' || !ownerId || ownerId === u.id); }
+function requireMaster(req, res) { if (!checkPassword(req)) { res.status(401).json({ error: 'Acesso negado.' }); return false; } if (!isMaster(req)) { res.status(403).json({ error: 'Só o master pode fazer isso.' }); return false; } return true; }
+const bootInfo = users.bootstrap();
+if (bootInfo.created || bootInfo.mode === 'users') { const mid = users.masterId(); if (mid) { const n = blogs.claimOrphans(mid); if (n) console.log(`migração: ${n} blog(s) sem dono → master`); } }
 
 // ---- /api/config ----
 app.get('/api/config', (req, res) => {
   res.json({
-    serverKey: !!SERVER_API_KEY, needPassword: !!ACCESS_PASSWORD,
-    personas: PERSONAS, languages: LANGUAGES, currencies: CURRENCIES, countries: COUNTRIES,
+    serverKey: !!SERVER_API_KEY, needPassword: true, firstRun: users.isFirstRun(), me: users.publicUser(authUser(req)),
+    personas: PERSONAS, personaGroups: PERSONA_GROUPS, languages: LANGUAGES, currencies: CURRENCIES, countries: COUNTRIES,
     creativePlatforms: CREATIVE_PLATFORMS, creativeSizes: CREATIVE_SIZES,
     models: MODELS
   });
 });
 
-// ---- /api/auth (rate-limit 5/60s + timingSafeEqual) ----
+// ---- /api/auth — login por usuário (rate-limit 5/60s por IP). Primeiro acesso sem users.json cria o master. ----
 app.post('/api/auth', (req, res) => {
-  if (!ACCESS_PASSWORD) return res.json({ ok: true });
   const ip = req.ip;
   const now = Date.now();
   let entry = authAttempts.get(ip);
-  if (!entry || now - entry.windowStart > AUTH_WINDOW_MS) {
-    entry = { count: 0, windowStart: now };
-    authAttempts.set(ip, entry);
-  }
-  if (entry.count >= AUTH_MAX_ATTEMPTS) {
-    return res.status(429).json({ ok: false, error: 'Muitas tentativas. Aguarde 1 minuto.' });
-  }
-  if (constantTimeEqual((req.body || {}).password, ACCESS_PASSWORD)) {
-    authAttempts.delete(ip);
-    return res.json({ ok: true });
-  }
+  if (!entry || now - entry.windowStart > AUTH_WINDOW_MS) { entry = { count: 0, windowStart: now }; authAttempts.set(ip, entry); }
+  if (entry.count >= AUTH_MAX_ATTEMPTS) return res.status(429).json({ ok: false, error: 'Muitas tentativas. Aguarde 1 minuto.' });
+  const body = req.body || {};
+  // compat: token antigo/sessão válida passada como "password" → renova
+  if (!body.user && body.password) { const u = users.verifyToken(body.password); if (u) return res.json({ ok: true, token: body.password, user: users.publicUser(u) }); }
+  let r = null;
+  try { r = users.login(body.user, body.password); } catch (e) { return res.status(400).json({ ok: false, error: e.message }); }
+  if (r) { authAttempts.delete(ip); return res.json({ ok: true, token: r.token, user: r.user }); }
   entry.count++;
-  res.status(401).json({ ok: false, error: 'Senha incorreta.' });
+  res.status(401).json({ ok: false, error: 'Usuário ou senha incorretos.' });
+});
+app.get('/api/me', (req, res) => {
+  const u = authUser(req); if (!u) return res.status(401).json({ error: 'Acesso negado.' });
+  res.json(users.publicUser(u));
+});
+app.post('/api/me/password', (req, res) => {
+  const u = authUser(req); if (!u) return res.status(401).json({ error: 'Acesso negado.' });
+  const b = req.body || {};
+  if (!users.verifyPassword(b.current, users.findById(u.id).pass)) return res.status(400).json({ error: 'senha atual incorreta' });
+  try { users.setPassword(u.id, b.password); const r = users.login(u.name, b.password); res.json({ ok: true, token: r.token }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+// ---- /api/users — só master ----
+app.get('/api/users', (req, res) => { if (!requireMaster(req, res)) return; res.json(users.listUsers()); });
+app.post('/api/users', (req, res) => {
+  if (!requireMaster(req, res)) return;
+  try { res.json({ ok: true, user: users.createUser(req.body || {}) }); } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post('/api/users/:id/password', (req, res) => {
+  if (!requireMaster(req, res)) return;
+  try { res.json({ ok: true, user: users.setPassword(req.params.id, (req.body || {}).password) }); } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post('/api/users/:id/active', (req, res) => {
+  if (!requireMaster(req, res)) return;
+  try { res.json({ ok: true, user: users.setActive(req.params.id, !!(req.body || {}).active) }); } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // ---- /api/brief — v4.1.2: gera o BRIEF detalhado do nicho (opcional) ----
@@ -141,20 +172,24 @@ app.post('/api/run', async (req, res) => {
 // ---- Histórico (cap de 200 no arquivo, via lib/history) ----
 app.get('/api/history', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
-  res.json(readHistory().slice(-60).reverse());
+  const u = authUser(req), umap = {}; if (u.role === 'master') users.listUsers().forEach(x => { umap[x.id] = x.name; });
+  const mine = readHistory().filter(e => canSee(req, e.owner));
+  res.json(mine.slice(-60).reverse().map(e => Object.assign({}, e, { owner_name: e.owner ? (umap[e.owner] || null) : null })));
 });
 app.post('/api/history', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
   const { niche, params, blocks } = req.body || {};
   const arr = readHistory();
-  const entry = { id: crypto.randomUUID(), niche: niche || 'sem-nome', params: params || {}, blocks: blocks || {}, created_at: new Date().toISOString() };
+  const entry = { id: crypto.randomUUID(), owner: authUser(req).id, niche: niche || 'sem-nome', params: params || {}, blocks: blocks || {}, created_at: new Date().toISOString() };
   arr.push(entry);
   writeHistory(arr);
   res.json({ ok: true, id: entry.id });
 });
 app.delete('/api/history/:id', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
-  writeHistory(readHistory().filter(e => e.id !== req.params.id));
+  const arr = readHistory(); const e = arr.find(x => x.id === req.params.id);
+  if (e && !canSee(req, e.owner)) return res.status(403).json({ error: 'Esse funil não é seu.' });
+  writeHistory(arr.filter(x => x.id !== req.params.id));
   res.json({ ok: true });
 });
 
@@ -165,29 +200,31 @@ app.delete('/api/history/:id', (req, res) => {
 // ---- /api/blogs — cadastro (senha de aplicação cifrada no volume; nunca volta) ----
 app.get('/api/blogs', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
-  res.json(blogs.listBlogs());
+  const umap = {}; if (isMaster(req)) users.listUsers().forEach(x => { umap[x.id] = x.name; });
+  res.json(blogs.listBlogs().filter(b => canSee(req, b.owner)).map(b => Object.assign({}, b, { owner_name: b.owner ? (umap[b.owner] || null) : null, mine: b.owner === authUser(req).id })));
 });
 // ---- armazenamento: persistente (volume) ou efêmero? + backup/restore dos blogs ----
 app.get('/api/storage', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
-  res.json(Object.assign(storageInfo(), { blogs: blogs.listBlogs().length }));
+  res.json(Object.assign(storageInfo(), { blogs: blogs.listBlogs().filter(b => canSee(req, b.owner)).length }));
 });
 app.get('/api/blogs/backup', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
-  res.json({ v: 1, at: new Date().toISOString(), entries: blogs.exportBackup() });
+  res.json({ v: 1, at: new Date().toISOString(), entries: blogs.exportBackup(isMaster(req) ? null : authUser(req).id) });
 });
 app.post('/api/blogs/restore', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
-  try { res.json(Object.assign({ ok: true }, blogs.importBackup((req.body || {}).entries))); }
+  try { res.json(Object.assign({ ok: true }, blogs.importBackup((req.body || {}).entries, authUser(req).id))); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.post('/api/blogs', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
-  try { res.json({ ok: true, blog: blogs.addBlog(req.body || {}) }); }
+  try { res.json({ ok: true, blog: blogs.addBlog(req.body || {}, authUser(req).id) }); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.delete('/api/blogs/:id', (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  if (!canSee(req, blogs.getBlogOwner(req.params.id))) return res.status(403).json({ error: 'Esse blog não é seu.' });
   blogs.removeBlog(req.params.id);
   res.json({ ok: true });
 });
@@ -195,6 +232,7 @@ app.delete('/api/blogs/:id', (req, res) => {
 // ---- /api/blogs/:id/test — conexão, papel, rota do grid, categorias ----
 app.post('/api/blogs/:id/test', async (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  if (!canSee(req, blogs.getBlogOwner(req.params.id))) return res.status(403).json({ error: 'Esse blog não é seu.' });
   const cred = blogs.getBlogCredentials(req.params.id);
   if (!cred) return res.status(404).json({ error: 'Blog não encontrado.' });
   try {
@@ -218,6 +256,7 @@ app.post('/api/blogs/:id/test', async (req, res) => {
 app.post('/api/publish', async (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
   const body = req.body || {};
+  if (!canSee(req, blogs.getBlogOwner(body.blogId))) return res.status(403).json({ error: 'Esse blog não é seu.' });
   const cred = blogs.getBlogCredentials(body.blogId);
   if (!cred) return res.status(404).json({ error: 'Blog não encontrado.' });
   const results = body.results || {};
@@ -245,8 +284,8 @@ app.post('/api/publish', async (req, res) => {
 
 app.listen(PORT, () => {
   const photoKeys = ['PEXELS_API_KEY', 'PIXABAY_API_KEY', 'UNSPLASH_ACCESS_KEY'].filter(k => process.env[k]);
-  console.log(`MBZ::CH4TB0T NEXUS v4 ONLINE -> port ${PORT}`);
+  console.log(`MBZ::CH4TB0T NEXUS v4.2 ONLINE -> port ${PORT}`);
   const st = storageInfo();
   console.log(`DATA_DIR: ${st.dir} (${st.source}) ${st.persistent ? '' : '— ⚠ EFÊMERO: monte um Volume em /data e defina DATA_DIR=/data'}`);
-  console.log(`Server key: ${SERVER_API_KEY ? 'YES' : 'NO'} | Password: ${ACCESS_PASSWORD ? 'YES' : 'NO'} | MAX_CONCURRENCY: ${process.env.MAX_CONCURRENCY || 3} | Fotos: ${photoKeys.length ? photoKeys.join('+') : 'NENHUMA key (grid sem fotos reais)'}`);
+  console.log(`Server key: ${SERVER_API_KEY ? 'YES' : 'NO'} | Auth: ${bootInfo.mode}${bootInfo.mode === 'first-run' ? ' (⚠ primeiro login cria o master)' : ''} · users: ${users.listUsers().length} | MAX_CONCURRENCY: ${process.env.MAX_CONCURRENCY || 3} | Fotos: ${photoKeys.length ? photoKeys.join('+') : 'NENHUMA key (grid sem fotos reais)'}`);
 });

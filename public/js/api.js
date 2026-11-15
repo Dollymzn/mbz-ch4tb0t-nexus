@@ -20,13 +20,18 @@ export function authHeaders() {
 export function getConfig() {
   return fetch('/api/config').then(function (r) { return r.json(); });
 }
-export function auth(password) {
+export function auth(password, user) {
   return fetch('/api/auth', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ password: password })
+    body: JSON.stringify(user ? { user: user, password: password } : { password: password })
   }).then(function (r) { return r.json(); });
 }
+export function getUsers() { return fetch('/api/users', { headers: authHeaders() }).then(function (r) { return r.json(); }); }
+export function createUser(data) { return fetch('/api/users', { method: 'POST', headers: authHeaders(), body: JSON.stringify(data) }).then(function (r) { return r.json(); }); }
+export function setUserPassword(id, password) { return fetch('/api/users/' + encodeURIComponent(id) + '/password', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ password: password }) }).then(function (r) { return r.json(); }); }
+export function setUserActive(id, active) { return fetch('/api/users/' + encodeURIComponent(id) + '/active', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ active: active }) }).then(function (r) { return r.json(); }); }
+export function changeMyPassword(current, password) { return fetch('/api/me/password', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ current: current, password: password }) }).then(function (r) { return r.json(); }); }
 export function getHistory() {
   return fetch('/api/history', { headers: authHeaders() }).then(function (r) { return r.json(); });
 }

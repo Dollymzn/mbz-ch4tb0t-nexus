@@ -144,6 +144,7 @@ export function gotoStep(n) {
   $('#wizNext').classList.toggle('hidden', n === totalSteps);
   $('#wizForge').classList.toggle('hidden', n !== totalSteps);
   if (n === totalSteps) updateSummary();
+  document.dispatchEvent(new CustomEvent('nexus:step', { detail: { step: n } }));
   if (n === 2) {
     const cl = $('#campaignLang'), ce = $('#campaignLangEcho');
     if (ce && cl) {
@@ -210,7 +211,7 @@ export function collectParams() {
   state.params = {
     niche: $('#niche').value.trim(), brief: ($('#brief') ? $('#brief').value.trim() : ''), pageName: $('#pageName').value.trim(), geoCountry: $('#geoCountry').value.trim(),
     flowLang: $('#flowLang').value, contentLang: $('#contentLang').value, campaignLang: $('#campaignLang').value, currency: $('#currency').value,
-    persona: ps.value, personaLabel: ps.options[ps.selectedIndex] ? ps.options[ps.selectedIndex].text : '',
+    persona: ps.value, personaLabel: ps.options[ps.selectedIndex] ? ps.options[ps.selectedIndex].text : '', personaCustom: ($('#personaCustom') ? $('#personaCustom').value.trim() : ''),
     onboardRoutes: +$('#onboardRoutes').value, onboardRouteType: $('#onboardRouteType').value,
     seqRoutes: +$('#seqRoutes').value, numP1: +$('#numP1').value,
     gridCols: +$('#gridCols').value, gridRows: +$('#gridRows').value,
@@ -318,27 +319,45 @@ function requireKey() {
   if (!state.cfg.serverKey && !state.userKey) { $('#keyModal').classList.remove('hidden'); return false; }
   return true;
 }
-function suggestNames(e) {
+const NAME_GROUPS = [{ id: 'fem', label: '♀ mulheres' }, { id: 'masc', label: '♂ homens' }, { id: 'marca', label: '◆ marcas / neutros' }];
+let nameSets = { fem: [], masc: [], marca: [] };
+let nameSeen = [];
+function renderNameGroups() {
+  const ch = $('#nameChips'); ch.innerHTML = '';
+  NAME_GROUPS.forEach(function (g) {
+    const box = document.createElement('div'); box.className = 'name-group';
+    const head = document.createElement('div'); head.className = 'name-group-head';
+    head.innerHTML = '<span>' + g.label + '</span>';
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'mini-btn name-more'; more.textContent = '↻ mais';
+    more.onclick = function (e) { e.preventDefault(); suggestNames(e, g.id, more); };
+    head.appendChild(more); box.appendChild(head);
+    const row = document.createElement('div'); row.className = 'chips';
+    (nameSets[g.id] || []).forEach(function (n) {
+      const c = document.createElement('span'); c.className = 'chip' + ($('#pageName').value === n ? ' on' : ''); c.textContent = n;
+      c.onclick = function () { $('#pageName').value = n; $$('#nameChips .chip').forEach(function (x) { x.classList.toggle('on', x === c); }); scheduleDraft(); };
+      row.appendChild(c);
+    });
+    if (!(nameSets[g.id] || []).length) row.innerHTML = '<span class="muted">—</span>';
+    box.appendChild(row); ch.appendChild(box);
+  });
+}
+function suggestNames(e, group, btnEl) {
   if (e) e.preventDefault();
   const niche = $('#niche').value.trim();
   if (!niche) { toast('Digite o nicho primeiro.'); return; }
   if (!requireKey()) return;
-  const btn = $('#suggestName'); const label = btn.textContent; btn.textContent = '...';
+  const btn = btnEl || $('#suggestName'); const label = btn.textContent; btn.textContent = '…'; btn.disabled = true;
   collectParams();
-  runSingle('page_name', state.params).then(function (res) {
-    btn.textContent = label;
+  const params = Object.assign({}, state.params, { nameGroup: group || null, nameAvoid: nameSeen.slice(-60) });
+  runSingle('page_name', params).then(function (res) {
+    btn.textContent = label; btn.disabled = false;
     const j = res.json;
-    if (j && j.names) {
-      $('#pageName').value = j.names[0];
-      const ch = $('#nameChips'); ch.innerHTML = '';
-      j.names.forEach(function (n) {
-        const c = document.createElement('span'); c.className = 'chip'; c.textContent = n;
-        c.onclick = function () { $('#pageName').value = n; scheduleDraft(); };
-        ch.appendChild(c);
-      });
-      scheduleDraft();
-    } else { toast('Sem sugestões.'); }
-  }).catch(function (err) { btn.textContent = label; toast(err.message || 'Falha ao sugerir.'); });
+    if (!j || (!j.fem && !j.masc && !j.marca && !j.names)) { toast('Sem sugestões.'); return; }
+    const keys = group ? [group] : ['fem', 'masc', 'marca'];
+    keys.forEach(function (k) { if (Array.isArray(j[k]) && j[k].length) { nameSets[k] = j[k].slice(0, 3); nameSeen = nameSeen.concat(j[k]); } });
+    if (!group && !$('#pageName').value.trim()) $('#pageName').value = (nameSets.fem[0] || nameSets.marca[0] || nameSets.masc[0] || '');
+    renderNameGroups(); scheduleDraft();
+  }).catch(function (err) { btn.textContent = label; btn.disabled = false; toast(err.message || 'Falha ao sugerir.'); });
 }
 
 /* ---------- fotos + bio + post (fb_images via runStream, com streaming) ---------- */

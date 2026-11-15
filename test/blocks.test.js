@@ -228,3 +228,20 @@ test('v4.1.2 — brief opcional: entra no contexto de todo bloco, o crítico tra
   const bp = buildBriefPrompt({ niche: 'Carta de Amor', campaignLang: 'en-US', tone: 'sensual' });
   ['ANGLE', 'TONE', 'PERSONA', 'TRIGGERS', 'DESIRED STRUCTURE', 'DO NOT', 'Tom pedido: sensual', 'en-US'].forEach(k => assert.ok(bp.includes(k), k));
 });
+
+test('v4.2 — personas: todas com voice+look, grupos, custom e marca sem rosto; nomes 3/3/3 com grupo e exclusão', () => {
+  const { PERSONAS, PERSONA_GROUPS } = require('../prompts');
+  const fixPageName = require('../lib/postprocess/page_name');
+  assert.ok(PERSONAS.length >= 40 && PERSONA_GROUPS.length === 4);
+  PERSONAS.filter(p => !p.custom && p.id !== 'sem_persona').forEach(p => assert.ok(p.voice && p.look && p.group, p.id));
+  assert.ok(buildBlockPrompt('onboard', { niche: 'x', persona: 'masc_sensual' }).includes('Voz masculina charmosa'));
+  assert.ok(buildBlockPrompt('onboard', { niche: 'x', persona: 'marca_canal' }).includes('SEM ROSTO'));
+  assert.ok(buildBlockPrompt('onboard', { niche: 'x', persona: 'custom', personaCustom: 'fala manso' }).includes('PERSONALIZADA — fala manso'));
+  const all = buildBlockPrompt('page_name', { niche: 'x', campaignLang: 'en-US' });
+  assert.ok(all.includes('Gere 9 nomes') && all.includes('"fem":') && all.includes('Love Message'));
+  const one = buildBlockPrompt('page_name', { niche: 'x', nameGroup: 'marca', nameAvoid: ['Love Message'] });
+  assert.ok(one.includes('SÓ do grupo MARCAS') && one.includes('NÃO repita') && one.includes('Love Message'));
+  const out = fixPageName({ fem: ['A', 'B', 'C', 'D'], masc: ['E'], marca: [' Love  Message '] });
+  assert.deepEqual(out.names, ['A', 'B', 'C', 'E', 'Love Message']);
+  assert.deepEqual(fixPageName({ names: ['X', 'Y'] }).fem, ['X', 'Y'], 'formato antigo compat');
+});

@@ -1156,3 +1156,188 @@
 .brief-actions input{flex:1;min-width:220px;font-size:12px;padding:8px 10px}
 .brief-count{font-size:11px;opacity:.6;margin-left:auto}
 .mini-btn.ghost{opacity:.6}
+
+/* ============================================================
+   V4.2 — CYBERPUNK OVERDRIVE II  (tudo abaixo liga/desliga com html[data-fx])
+   ============================================================ */
+
+/* ---------- cursor ---------- */
+html[data-fx="full"] body{
+  cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='3' fill='none' stroke='%2300f5ff' stroke-width='1.5'/><path d='M12 1v6M12 17v6M1 12h6M17 12h6' stroke='%2300f5ff' stroke-width='1.5'/><circle cx='12' cy='12' r='1' fill='%23ff2d78'/></svg>") 12 12, crosshair;
+}
+html[data-fx="full"] button, html[data-fx="full"] a, html[data-fx="full"] .tab, html[data-fx="full"] .rail-node, html[data-fx="full"] .grid-cell, html[data-fx="full"] label.switch-inline, html[data-fx="full"] select{
+  cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'><path d='M4 4l8 18 2-8 8-2z' fill='%2300f5ff' stroke='%23050610' stroke-width='1.2'/><path d='M12 12l9 9' stroke='%23ff2d78' stroke-width='2'/></svg>") 4 4, pointer;
+}
+
+/* ---------- CRT: curvatura, flicker, cromática, ruído ---------- */
+.crt{ position:fixed; inset:0; z-index:9996; pointer-events:none; display:none }
+html[data-fx="full"] .crt{
+  display:block;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.35) 100%),
+    linear-gradient(90deg, rgba(255,45,120,.035), transparent 12%, transparent 88%, rgba(0,245,255,.035));
+  animation:crtFlicker 7s infinite steps(1);
+}
+.noise{ position:fixed; inset:-50%; z-index:9995; pointer-events:none; display:none; opacity:.035;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+html[data-fx="full"] .noise{ display:block; animation:noiseShift .35s steps(3) infinite }
+@keyframes noiseShift{ 0%{transform:translate(0,0)} 33%{transform:translate(-3%,2%)} 66%{transform:translate(2%,-3%)} 100%{transform:translate(0,0)} }
+@keyframes crtFlicker{ 0%,94%,100%{opacity:1} 95%{opacity:.86} 96%{opacity:1} 97.5%{opacity:.9} 98%{opacity:1} }
+html[data-fx="full"] .scanlines{
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px), repeating-linear-gradient(0deg, rgba(var(--cyan-rgb)/.025) 0 1px, transparent 1px 2px);
+  mix-blend-mode:multiply; animation:scan 6s linear infinite;
+}
+html[data-fx="full"] #fx{ opacity:.75 }
+
+/* ---------- glitch nos títulos ---------- */
+.glitch{ position:relative; display:inline-block }
+.glitch::before,.glitch::after{
+  content:attr(data-text); position:absolute; inset:0; overflow:hidden; opacity:0; pointer-events:none; white-space:nowrap;
+}
+.glitch::before{ color:var(--pink); text-shadow:-2px 0 var(--pink); clip-path:inset(0 0 60% 0) }
+.glitch::after{ color:var(--cyan); text-shadow:2px 0 var(--cyan); clip-path:inset(55% 0 0 0) }
+html[data-fx="full"] .glitch.glitching::before{ opacity:.9; animation:glitchA .28s steps(2) infinite }
+html[data-fx="full"] .glitch.glitching::after{ opacity:.9; animation:glitchB .22s steps(3) infinite }
+html[data-fx="full"] .glitch.glitching{ animation:glitchShake .26s steps(2) infinite }
+@keyframes glitchA{ 0%{transform:translate(-3px,-1px);clip-path:inset(0 0 60% 0)} 50%{transform:translate(3px,1px);clip-path:inset(20% 0 40% 0)} 100%{transform:translate(-2px,2px);clip-path:inset(60% 0 5% 0)} }
+@keyframes glitchB{ 0%{transform:translate(3px,1px);clip-path:inset(55% 0 0 0)} 50%{transform:translate(-3px,-2px);clip-path:inset(10% 0 70% 0)} 100%{transform:translate(2px,0);clip-path:inset(35% 0 30% 0)} }
+@keyframes glitchShake{ 0%{transform:skewX(0)} 30%{transform:skewX(-3deg)} 60%{transform:skewX(2deg)} 100%{transform:skewX(0)} }
+.brand-name.glitch span{ color:var(--pink) }
+html[data-fx="full"] .step-title{ text-shadow:0 0 22px rgba(var(--cyan-rgb)/.35), 2px 0 0 rgba(var(--pink-rgb)/.25), -2px 0 0 rgba(var(--cyan-rgb)/.25) }
+
+/* ---------- HUD: cantos, réguas e etiquetas ---------- */
+html[data-fx="full"] .block-card, html[data-fx="full"] .step.active, html[data-fx="full"] .publish-panel, html[data-fx="full"] .gate-box{
+  --hud:var(--cyan);
+  background-image:
+    linear-gradient(var(--hud), var(--hud)), linear-gradient(var(--hud), var(--hud)),
+    linear-gradient(var(--hud), var(--hud)), linear-gradient(var(--hud), var(--hud)),
+    linear-gradient(var(--hud), var(--hud)), linear-gradient(var(--hud), var(--hud)),
+    linear-gradient(var(--hud), var(--hud)), linear-gradient(var(--hud), var(--hud));
+  background-repeat:no-repeat;
+  background-size:18px 2px, 2px 18px, 18px 2px, 2px 18px, 18px 2px, 2px 18px, 18px 2px, 2px 18px;
+  background-position:0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%;
+}
+html[data-fx="full"] .block-card.st-error, html[data-fx="full"] .block-card.st-interrupted{ --hud:var(--pink) }
+html[data-fx="full"] .block-card.st-done{ --hud:var(--green) }
+html[data-fx="full"] .block-card.st-loading, html[data-fx="full"] .block-card.st-reviewing{ --hud:var(--amber) }
+html[data-fx="full"] .step.active{ position:relative; padding:4px 6px 6px }
+html[data-fx="full"] .step.active::after{
+  content:'SYS//' attr(data-step) ' · ONLINE'; position:absolute; right:10px; top:-2px; font-family:var(--f-mono); font-size:10px; letter-spacing:2px; color:var(--faint); opacity:.7;
+}
+html[data-fx="full"] .block-card::after{
+  content:''; position:absolute; left:0; right:0; top:0; height:2px; z-index:3; pointer-events:none; opacity:0;
+  background:linear-gradient(90deg, transparent, var(--cyan), transparent);
+}
+html[data-fx="full"] .block-card.st-loading::after, html[data-fx="full"] .block-card.st-reviewing::after{ opacity:1; animation:hudSweep 1.6s linear infinite }
+@keyframes hudSweep{ 0%{transform:translateY(0)} 100%{transform:translateY(420px)} }
+
+/* ---------- botões: brilho varrendo + borda de energia ---------- */
+html[data-fx="full"] .btn-primary::after{
+  content:''; position:absolute; inset:-2px; background:linear-gradient(120deg, transparent 30%, rgba(255,255,255,.45) 50%, transparent 70%);
+  transform:translateX(-120%); transition:none; pointer-events:none;
+}
+html[data-fx="full"] .btn-primary:hover::after{ animation:btnSweep .8s var(--ease-out) }
+@keyframes btnSweep{ to{ transform:translateX(120%) } }
+html[data-fx="full"] .btn-primary{ box-shadow:0 0 0 1px rgba(var(--cyan-rgb)/.6), 0 0 24px rgba(var(--cyan-rgb)/.35), inset 0 0 18px rgba(255,255,255,.08) }
+html[data-fx="full"] .btn-primary:hover{ box-shadow:0 0 0 1px var(--cyan), 0 0 40px rgba(var(--cyan-rgb)/.6), inset 0 0 22px rgba(255,255,255,.14); transform:translateY(-1px) }
+html[data-fx="full"] .tab.active{ box-shadow:0 0 22px rgba(var(--cyan-rgb)/.6), inset 0 -3px 0 var(--pink) }
+html[data-fx="full"] .mini-btn:hover{ box-shadow:0 0 14px rgba(var(--cyan-rgb)/.45) }
+
+/* ---------- topbar HUD ---------- */
+.hud-btn{ font-family:var(--f-mono); font-size:11px; letter-spacing:1px; background:transparent; border:1px solid var(--brd); color:var(--muted); padding:5px 9px; border-radius:6px; cursor:pointer; transition:all var(--dur-2) }
+.hud-btn:hover{ border-color:var(--cyan); color:var(--cyan); box-shadow:0 0 10px rgba(var(--cyan-rgb)/.35) }
+.hud-btn.muted{ color:var(--pink); border-color:rgba(var(--pink-rgb)/.5) }
+html[data-fx="full"] .topbar{ border-bottom:1px solid rgba(var(--cyan-rgb)/.35); box-shadow:0 1px 0 rgba(var(--pink-rgb)/.25), 0 10px 40px rgba(0,0,0,.5) }
+html[data-fx="full"] .topbar::after{
+  content:''; position:absolute; left:0; right:0; bottom:-1px; height:1px; background:linear-gradient(90deg, transparent, var(--cyan), var(--pink), transparent); background-size:200% 100%; animation:hudLine 4s linear infinite;
+}
+html[data-fx="full"] .topbar{ position:sticky; top:0; z-index:50 }
+@keyframes hudLine{ to{ background-position:200% 0 } }
+html[data-fx="full"] .clock{ text-shadow:0 0 10px rgba(var(--cyan-rgb)/.7) }
+
+/* ---------- rail / progresso com flicker ---------- */
+html[data-fx="full"] .rail-fill, html[data-fx="full"] .pub-bar-fill{ box-shadow:0 0 14px var(--cyan), 0 0 30px rgba(var(--cyan-rgb)/.5); animation:barFlicker 1.3s infinite steps(1) }
+@keyframes barFlicker{ 0%,80%,100%{filter:brightness(1)} 85%{filter:brightness(1.6)} 90%{filter:brightness(.8)} }
+html[data-fx="full"] .rail-node.active .rail-num{ animation:nodePulse 1.4s ease-in-out infinite }
+@keyframes nodePulse{ 0%,100%{box-shadow:0 0 14px rgba(var(--cyan-rgb)/.5)} 50%{box-shadow:0 0 30px var(--cyan), 0 0 50px rgba(var(--pink-rgb)/.4)} }
+
+/* ---------- transição "terminal" entre passos ---------- */
+html[data-fx="full"] .step.active{ animation:stepTerminal .55s var(--ease-out) both }
+@keyframes stepTerminal{
+  0%{ opacity:0; transform:translateY(10px) scaleY(.96); filter:brightness(2) saturate(0); clip-path:inset(0 0 100% 0) }
+  40%{ opacity:1; filter:brightness(1.4) saturate(.6); clip-path:inset(0 0 40% 0) }
+  100%{ opacity:1; transform:none; filter:none; clip-path:inset(0) }
+}
+
+/* ---------- inputs: foco com régua neon ---------- */
+html[data-fx="full"] input:focus, html[data-fx="full"] textarea:focus, html[data-fx="full"] select:focus{
+  box-shadow:0 0 0 1px var(--cyan), 0 0 18px rgba(var(--cyan-rgb)/.35), inset 0 0 14px rgba(var(--cyan-rgb)/.06); border-color:var(--cyan);
+}
+html[data-fx="full"] .big-field input:focus{ text-shadow:0 0 12px rgba(var(--cyan-rgb)/.6) }
+
+/* ---------- boot screen ---------- */
+.boot{ position:fixed; inset:0; z-index:10000; background:radial-gradient(ellipse at center, #0b0d1c 0%, #050610 70%); display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); color:var(--cyan); transition:opacity .4s, transform .4s }
+.boot.boot-out{ opacity:0; transform:scale(1.04); pointer-events:none }
+.boot-box{ width:min(640px, 92vw) }
+.boot-logo{ font-family:var(--f-display); font-weight:900; font-size:clamp(42px, 9vw, 84px); letter-spacing:10px; color:var(--cyan); text-shadow:0 0 30px rgba(var(--cyan-rgb)/.7), 0 0 80px rgba(var(--pink-rgb)/.35); line-height:1 }
+.boot-sub{ color:var(--muted); font-size:12px; letter-spacing:3px; margin:10px 0 22px }
+.boot-log{ min-height:200px; font-size:13px; line-height:1.65; color:#8be9f5 }
+.boot-line{ animation:bootLine .18s steps(2) both }
+.boot-line:last-child{ color:#fff; text-shadow:0 0 8px var(--cyan) }
+@keyframes bootLine{ from{opacity:0; transform:translateX(-6px)} to{opacity:1; transform:none} }
+.boot-bar{ height:4px; background:rgba(255,255,255,.08); margin:16px 0 10px; overflow:hidden }
+.boot-bar i{ display:block; height:100%; width:0; background:linear-gradient(90deg, var(--cyan), var(--pink)); box-shadow:0 0 16px var(--cyan); transition:width .15s }
+.boot-skip{ font-size:11px; color:var(--faint); letter-spacing:2px; text-align:right }
+
+/* ---------- cards: cabeçalho com leitura de telemetria ---------- */
+html[data-fx="full"] .block-head{ background:linear-gradient(90deg, var(--panel2), rgba(var(--cyan-rgb)/.06) 60%, var(--panel2)) }
+html[data-fx="full"] .block-title::before{ content:'▮'; color:var(--pink); font-size:10px; margin-right:2px; animation:pulseFast 1.2s infinite }
+html[data-fx="full"] .block-status{ letter-spacing:2px; text-transform:uppercase; font-size:10px }
+
+/* ---------- seleção / grid-cells ---------- */
+html[data-fx="full"] .grid-cell:hover, html[data-fx="full"] .sel-card:hover{ box-shadow:0 0 0 1px rgba(var(--cyan-rgb)/.5), 0 0 20px rgba(var(--cyan-rgb)/.2) }
+html[data-fx="full"] .grid-cell.on, html[data-fx="full"] .grid-cell.active{ box-shadow:0 0 0 1px var(--cyan), 0 0 24px rgba(var(--cyan-rgb)/.35), inset 0 0 20px rgba(var(--cyan-rgb)/.08) }
+
+/* ---------- toasts ---------- */
+html[data-fx="full"] .toast{ border-left:3px solid var(--pink); box-shadow:0 0 24px rgba(var(--pink-rgb)/.35), 0 0 0 1px rgba(var(--cyan-rgb)/.3) }
+
+/* ---------- modo lite: desliga tudo que pesa ---------- */
+html[data-fx="lite"] .scanlines, html[data-fx="lite"] .crt, html[data-fx="lite"] .noise{ display:none }
+html[data-fx="lite"] .glitch::before, html[data-fx="lite"] .glitch::after{ display:none }
+html[data-fx="lite"] #fx{ opacity:.35 }
+
+@media (prefers-reduced-motion: reduce){
+  .scanlines, .crt, .noise{ animation:none !important }
+  .glitch::before, .glitch::after{ display:none }
+}
+@media (max-width: 720px){
+  .hud-btn{ padding:4px 6px; font-size:10px }
+  .boot-log{ min-height:160px; font-size:11px }
+}
+
+/* personas + nomes (v4.2) */
+.persona-custom{ margin-top:8px }
+.persona-custom textarea{ font-size:12px; line-height:1.45 }
+.name-groups{ display:flex; flex-direction:column; gap:10px; margin-top:10px }
+.name-group{ border:1px solid var(--brd); border-radius:8px; padding:8px 10px; background:rgba(255,255,255,.02) }
+.name-group-head{ display:flex; justify-content:space-between; align-items:center; font-family:var(--f-mono); font-size:11px; letter-spacing:2px; color:var(--muted); margin-bottom:6px }
+.name-group .chips{ display:flex; flex-wrap:wrap; gap:6px }
+.name-group .chip.on{ background:var(--cyan); color:var(--void); border-color:var(--cyan); box-shadow:0 0 14px rgba(var(--cyan-rgb)/.5) }
+.name-more{ padding:3px 8px; font-size:11px }
+
+/* login / usuários (v4.2) */
+.gate input#gateUser{ letter-spacing:1px }
+.gate-first{ margin-top:14px; font-family:var(--f-mono); font-size:11px; color:var(--amber); border:1px dashed rgba(255,204,51,.5); padding:10px; border-radius:8px; text-align:left; line-height:1.5 }
+.user-chip{ font-family:var(--f-mono); font-size:12px; color:var(--cyan); border:1px solid rgba(var(--cyan-rgb)/.4); padding:5px 10px; border-radius:999px; cursor:pointer; letter-spacing:1px }
+.user-chip.master{ color:var(--amber); border-color:rgba(255,204,51,.5); text-shadow:0 0 8px rgba(255,204,51,.5) }
+.user-chip:hover{ box-shadow:0 0 12px rgba(var(--cyan-rgb)/.4) }
+.owner-pin{ color:var(--amber) !important; border-color:rgba(255,204,51,.4) !important; margin-left:6px }
+.user-row.off{ opacity:.5 }
+.modal-actions{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:8px }
+.section-head{ margin-bottom:18px }
+.user-chip{ white-space:nowrap }
+.blog-info .owner-pin{ display:inline-block }
+
+.cost-pin{ font-size:10px; opacity:.75; margin-left:6px }
+.run-cost{ align-self:center; color:var(--amber) !important; border-color:rgba(255,204,51,.4) !important }

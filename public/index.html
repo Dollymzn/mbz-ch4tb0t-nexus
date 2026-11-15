@@ -14,17 +14,32 @@
 <body>
 <canvas id="fx"></canvas>
 <div class="scanlines"></div>
+<div class="crt"></div>
 <div class="vignette"></div>
+<div class="noise"></div>
+
+<!-- ===== BOOT ===== -->
+<div id="boot" class="boot">
+  <div class="boot-box">
+    <div class="boot-logo glitch" data-text="NEXUS">NEXUS</div>
+    <div class="boot-sub">MBZ::CH4TB0T · v4.2 · cyberpunk overdrive II</div>
+    <div class="boot-log"></div>
+    <div class="boot-bar"><i></i></div>
+    <div class="boot-skip">[ clique ou tecla pra pular ]</div>
+  </div>
+</div>
 
 <!-- ===== GATE ===== -->
 <div id="gate" class="gate hidden">
   <div class="gate-box">
-    <div class="gate-glitch" data-text="NEXUS">NEXUS</div>
+    <div class="gate-glitch glitch" data-text="NEXUS">NEXUS</div>
     <div class="gate-logo">MBZ::CH4TB0T<span>NEXUS</span></div>
     <p class="gate-sub">// acesso restrito — MBOLIVEIRAZ MEDIA &amp; TECH</p>
-    <input type="password" id="gatePass" placeholder="senha de acesso" autocomplete="off">
+    <input type="text" id="gateUser" placeholder="usuário" autocomplete="username" autocapitalize="off">
+    <input type="password" id="gatePass" placeholder="senha" autocomplete="current-password">
     <button id="gateBtn" class="btn-primary">INICIAR SESSÃO <span>⚡</span></button>
     <div id="gateErr" class="gate-err"></div>
+    <div id="gateFirst" class="gate-first hidden">⚠ PRIMEIRO ACESSO — nenhum usuário cadastrado. O usuário e a senha que você digitar agora viram o <b>master</b>.</div>
   </div>
 </div>
 
@@ -33,15 +48,19 @@
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark">◆</div>
-      <div class="brand-name">MBZ::CH4TB0T<span>NEXUS</span></div>
+      <div class="brand-name glitch" data-text="MBZ::CH4TB0T NEXUS">MBZ::CH4TB0T<span>NEXUS</span></div>
     </div>
     <nav class="tabs">
       <button class="tab active" data-tab="creator"><i>⚡</i> CRIADOR</button>
       <button class="tab" data-tab="optimizer"><i>🔧</i> OTIMIZADOR</button>
       <button class="tab" data-tab="history"><i>📂</i> HISTÓRICO</button>
       <button class="tab" data-tab="blogs"><i>🌐</i> BLOGS</button>
+      <button class="tab hidden" data-tab="users" id="tabUsers"><i>👥</i> USUÁRIOS</button>
     </nav>
     <div class="status-cluster">
+      <span class="user-chip" id="userChip" title="clique pra trocar a senha / sair"></span>
+      <button class="hud-btn no-sfx" id="fxBtn" type="button" title="efeitos">FX ▮▮▮</button>
+      <button class="hud-btn no-sfx" id="sfxBtn" type="button" title="sons">🔊</button>
       <span class="status-dot" id="connDot"></span>
       <span class="clock" id="clock">--:--:--</span>
     </div>
@@ -138,7 +157,10 @@
             <div class="sel-card persona-card">
               <label>🎭 Persona</label>
               <select id="persona"></select>
-              <small>Quem conversa com o lead</small>
+              <small id="personaHint">Quem conversa com o lead</small>
+              <div id="personaCustomBox" class="hidden persona-custom">
+                <textarea id="personaCustom" rows="4" placeholder="VOZ: como ela/ele fala (tom, ritmo, vocabulário)… VISUAL (em inglês): idade aproximada, expressão, luz, roupa, ambiente, props…"></textarea>
+              </div>
             </div>
             <div class="sel-card">
               <label>🤖 Modelo do Claude</label>
@@ -348,6 +370,8 @@
     <div class="output-actions hidden" id="outputActions">
       <button id="saveBtn" class="btn-ghost">💾 Salvar no histórico</button>
       <button id="downloadAll" class="btn-ghost">⬇️ Baixar todos os JSONs</button>
+      <button id="zipBtn" class="btn-ghost">🗜 ZIP do funil</button>
+      <span id="runCost" class="pin run-cost hidden"></span>
       <button id="publishBtn" class="btn-primary hidden">🌐 Publicar no blog</button>
     </div>
 
@@ -515,7 +539,37 @@
     <div id="blogList" class="blog-list"></div>
   </section>
 
-  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.1.2 · <span id="modelFoot"></span></footer>
+  <!-- ============ USUÁRIOS (master) ============ -->
+  <section id="tab-users" class="view hidden">
+    <div class="section-head"><h2 class="step-title">Usuários</h2><p class="step-help">Cada gestor vê só os próprios blogs e funis. Você (master) vê tudo, cria usuários e redefine senhas. Sem e-mail: quem esquecer a senha, você redefine aqui.</p></div>
+    <div class="blog-form">
+      <div class="card-grid">
+        <div class="sel-card"><label>Usuário</label><input type="text" id="newUserName" placeholder="ana, lucas, alice…" autocapitalize="off"></div>
+        <div class="sel-card"><label>Senha inicial</label><input type="text" id="newUserPass" placeholder="6+ caracteres"></div>
+        <div class="sel-card"><label>Papel</label><select id="newUserRole"><option value="gestor">gestor</option><option value="master">master</option></select><small>master vê tudo</small></div>
+      </div>
+      <button class="btn-primary" id="userAdd" type="button">➕ CRIAR USUÁRIO</button>
+    </div>
+    <div id="userList" class="blog-list"></div>
+  </section>
+
+  <!-- ===== MODAL: minha senha ===== -->
+  <div id="pwModal" class="modal hidden">
+    <div class="modal-box">
+      <h3>Minha conta</h3>
+      <p class="step-help" id="pwWho"></p>
+      <input type="password" id="pwCurrent" placeholder="senha atual" autocomplete="current-password">
+      <input type="password" id="pwNew" placeholder="nova senha (6+)" autocomplete="new-password">
+      <div class="modal-actions">
+        <button class="mini-btn" id="pwSave" type="button">salvar senha</button>
+        <button class="mini-btn ghost" id="pwLogout" type="button">sair da conta</button>
+        <button class="mini-btn ghost" id="pwClose" type="button">fechar</button>
+      </div>
+      <div id="pwErr" class="gate-err"></div>
+    </div>
+  </div>
+
+  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.2 · <span id="modelFoot"></span></footer>
 </div>
 
 <!-- ===== API KEY MODAL ===== -->

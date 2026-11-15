@@ -6,9 +6,10 @@
 'use strict';
 
 import { state, esc, toast, setModel, setUserKey, setAccessPass, resetRun, mergeArtifacts } from './state.js';
-import { initFX, startClock } from './fx.js';
-import { getConfig, auth, getHistory, saveHistory, deleteHistory, generateBrief, getStorage, backupBlogs, restoreBlogs, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
-import { makeRunView, exportJson } from './render.js';
+import { initFX, startClock, initCyberpunk, bootScreen } from './fx.js';
+import { getConfig, auth, getUsers, createUser, setUserPassword, setUserActive, changeMyPassword, getHistory, saveHistory, deleteHistory, generateBrief, getStorage, backupBlogs, restoreBlogs, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
+import { makeRunView, exportJson, funnelFiles } from './render.js';
+import { makeZip, downloadBlob } from './zip.js';
 import { initWizard, collectParams, selectedBlocks, gotoStep } from './wizard.js';
 import './anim.js'; // efeitos que exigem JS: boot do gate, ripple, View Transitions
 
@@ -18,7 +19,7 @@ const $$ = function (s) { return [].slice.call(document.querySelectorAll(s)); };
 let appStarted = false;
 
 document.addEventListener('DOMContentLoaded', function () {
-  initFX(); startClock(); loadConfig();
+  initFX(); startClock(); initCyberpunk(); bootScreen(loadConfig);
 });
 
 /* ---------- config / selects / modelos ---------- */
@@ -30,7 +31,7 @@ function loadConfig() {
     fillSel('#campaignLang', cfg.languages, 'id', 'label', 'pt-BR');
     if (cfg.countries) fillSel('#geoCountry', cfg.countries, 'label', 'label', 'Brasil');
     fillSel('#currency', cfg.currencies, 'id', 'label', 'USD');
-    fillSel('#persona', cfg.personas, 'id', 'label', 'sem_persona');
+    fillPersonaSel(cfg.personas, cfg.personaGroups);
     fillSel('#creativePlatform', cfg.creativePlatforms, 'id', 'label', 'svg_claude');
     fillSel('#optCreativePlatform', cfg.creativePlatforms, 'id', 'label', 'google_flow');
     fillSel('#creativeSize', cfg.creativeSizes, 'id', 'label', '1080x1440');
@@ -46,8 +47,27 @@ function loadConfig() {
     }
     ['#optModel', '#modelGlobal', '#modelWizard'].forEach(fillModels);
     $('#modelFoot').textContent = 'modelo: ' + (state.model || '—');
-    if (cfg.needPassword && !state.accessPass) showGate(); else verifyEnter();
+    verifyEnter();
   }).catch(function () { toast('Falha ao carregar /api/config.'); });
+}
+function fillPersonaSel(items, groups) {
+  const el = $('#persona'); if (!el || !items) return;
+  el.innerHTML = '';
+  (groups || [{ id: '', label: '' }]).forEach(function (g) {
+    const og = document.createElement('optgroup'); og.label = g.label;
+    items.filter(function (it) { return (it.group || '') === g.id; }).forEach(function (it) {
+      const o = document.createElement('option'); o.value = it.id; o.textContent = it.label; o.title = it.voice || '';
+      if (it.id === 'sem_persona') o.selected = true;
+      og.appendChild(o);
+    });
+    if (og.children.length) el.appendChild(og);
+  });
+  const sync = function () {
+    const meta = items.find(function (it) { return it.id === el.value; }) || {};
+    const box = $('#personaCustomBox'); if (box) box.classList.toggle('hidden', el.value !== 'custom');
+    const hint = $('#personaHint'); if (hint) hint.textContent = meta.voice ? meta.voice.slice(0, 160) + (meta.voice.length > 160 ? '…' : '') : 'Quem conversa com o lead';
+  };
+  el.addEventListener('change', sync); setTimeout(sync, 0);
 }
 function fillSel(sel, items, vk, lk, def) {
   const el = $(sel); if (!el || !items) return;
@@ -81,29 +101,84 @@ function syncModelSelects() {
   ['#optModel', '#modelGlobal', '#modelWizard'].forEach(function (s) { const el = $(s); if (el && el.value !== state.model) el.value = state.model; });
 }
 
-/* ---------- gate / auth ---------- */
+/* ---------- gate / auth (v4.2: usuário + senha → token de sessão) ---------- */
 function showGate() {
   $('#gate').classList.remove('hidden');
+  if (state.cfg && state.cfg.firstRun) $('#gateFirst').classList.remove('hidden');
   $('#gateBtn').onclick = function () {
-    const p = $('#gatePass').value;
-    auth(p).then(function (res) {
-      if (res.ok) { setAccessPass(p); $('#gate').classList.add('hidden'); enterApp(); }
-      else $('#gateErr').textContent = res.error || 'Senha incorreta.';
-    });
+    const u = $('#gateUser').value.trim(), p = $('#gatePass').value;
+    if (!u || !p) { $('#gateErr').textContent = 'Informe usuário e senha.'; return; }
+    auth(p, u).then(function (res) {
+      if (res.ok && res.token) { setAccessPass(res.token); state.me = res.user; $('#gate').classList.add('hidden'); enterApp(); }
+      else $('#gateErr').textContent = res.error || 'Usuário ou senha incorretos.';
+    }).catch(function () { $('#gateErr').textContent = 'Falha de conexão.'; });
   };
   $('#gatePass').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#gateBtn').click(); });
+  $('#gateUser').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#gatePass').focus(); });
+  setTimeout(function () { $('#gateUser').focus(); }, 50);
 }
 function verifyEnter() {
-  if (state.cfg.needPassword) {
-    auth(state.accessPass).then(function (res) { res.ok ? enterApp() : showGate(); });
-  } else enterApp();
+  if (!state.accessPass) { showGate(); return; }
+  auth(state.accessPass).then(function (res) {
+    if (res.ok && res.user) { state.me = res.user; enterApp(); } else { setAccessPass(''); showGate(); }
+  }).catch(function () { showGate(); });
+}
+function logout() { setAccessPass(''); state.me = null; location.reload(); }
+function wireAccount() {
+  const chip = $('#userChip'); if (!chip) return;
+  const me = state.me || {};
+  chip.innerHTML = (me.role === 'master' ? '★ ' : '@') + esc(me.name || '?');
+  chip.classList.toggle('master', me.role === 'master');
+  chip.onclick = function () { $('#pwWho').textContent = (me.role === 'master' ? 'master · ' : 'gestor · ') + me.name; $('#pwErr').textContent = ''; $('#pwModal').classList.remove('hidden'); };
+  $('#pwClose').onclick = function () { $('#pwModal').classList.add('hidden'); };
+  $('#pwLogout').onclick = logout;
+  $('#pwSave').onclick = function () {
+    changeMyPassword($('#pwCurrent').value, $('#pwNew').value).then(function (r) {
+      if (r.ok) { setAccessPass(r.token); $('#pwModal').classList.add('hidden'); toast('Senha alterada'); $('#pwCurrent').value = ''; $('#pwNew').value = ''; }
+      else $('#pwErr').textContent = r.error || 'falhou';
+    });
+  };
+  if (me.role === 'master') { $('#tabUsers').classList.remove('hidden'); wireUsers(); }
+}
+/* ---------- usuários (master) ---------- */
+function wireUsers() {
+  $('#userAdd').onclick = function () {
+    createUser({ name: $('#newUserName').value.trim(), password: $('#newUserPass').value, role: $('#newUserRole').value }).then(function (r) {
+      if (r.ok) { toast('Usuário ' + r.user.name + ' criado'); $('#newUserName').value = ''; $('#newUserPass').value = ''; loadUsers(); }
+      else toast('Erro: ' + (r.error || '?'));
+    });
+  };
+}
+function loadUsers() {
+  const list = $('#userList'); if (!list) return;
+  list.innerHTML = '<p class="step-help">carregando…</p>';
+  getUsers().then(function (arr) {
+    if (!Array.isArray(arr)) { list.innerHTML = '<p class="step-help">' + esc((arr && arr.error) || 'erro') + '</p>'; return; }
+    list.innerHTML = arr.map(function (u) {
+      return '<div class="blog-row user-row' + (u.active ? '' : ' off') + '" data-id="' + esc(u.id) + '">' +
+        '<div class="blog-info"><b>' + (u.role === 'master' ? '★ ' : '') + esc(u.name) + '</b><span class="pin">' + esc(u.role) + (u.active ? '' : ' · DESATIVADO') + '</span><small>criado ' + esc(new Date(u.created_at).toLocaleDateString('pt-BR')) + (u.last_login ? ' · último login ' + esc(new Date(u.last_login).toLocaleString('pt-BR')) : ' · nunca entrou') + '</small></div>' +
+        '<div class="blog-actions"><button class="mini-btn" data-pw>redefinir senha</button>' + (u.role !== 'master' ? '<button class="mini-btn ghost" data-act>' + (u.active ? 'desativar' : 'reativar') + '</button>' : '') + '</div></div>';
+    }).join('');
+    list.querySelectorAll('[data-pw]').forEach(function (btn) {
+      btn.onclick = function () {
+        const id = btn.closest('.user-row').dataset.id; const pw = prompt('Nova senha (6+ caracteres):'); if (!pw) return;
+        setUserPassword(id, pw).then(function (r) { toast(r.ok ? 'Senha redefinida' : 'Erro: ' + (r.error || '?')); });
+      };
+    });
+    list.querySelectorAll('[data-act]').forEach(function (btn) {
+      btn.onclick = function () {
+        const row = btn.closest('.user-row'); const id = row.dataset.id; const active = row.classList.contains('off');
+        setUserActive(id, active).then(function (r) { if (r.ok) loadUsers(); else toast('Erro: ' + (r.error || '?')); });
+      };
+    });
+  });
 }
 function enterApp() {
   if (appStarted) return; appStarted = true;
   $('#app').classList.remove('hidden');
   initWizard();
   buildClassic();
-  wireTabs(); wireModes(); wireKeyModal(); wireOptimizer(); wireOutputActions(); wireBlogs(); wirePublisher(); wireBrief();
+  wireTabs(); wireModes(); wireKeyModal(); wireOptimizer(); wireOutputActions(); wireBlogs(); wirePublisher(); wireBrief(); wireAccount();
   if (!state.cfg.serverKey && !state.userKey) $('#keyModal').classList.remove('hidden');
   loadHistory();
 }
@@ -119,8 +194,10 @@ function wireTabs() {
       $('#tab-optimizer').classList.toggle('hidden', tb !== 'optimizer');
       $('#tab-history').classList.toggle('hidden', tb !== 'history');
       if ($('#tab-blogs')) $('#tab-blogs').classList.toggle('hidden', tb !== 'blogs');
+      if ($('#tab-users')) $('#tab-users').classList.toggle('hidden', tb !== 'users');
       if (tb === 'history') loadHistory();
       if (tb === 'blogs') loadBlogs();
+      if (tb === 'users') loadUsers();
     };
   });
 }
@@ -433,12 +510,24 @@ function loadHistory() {
     el.innerHTML = '';
     list.forEach(function (h) {
       const d = document.createElement('div'); d.className = 'hist-item';
-      d.innerHTML = '<div class="hist-info"><b>' + esc(h.niche) + '</b><small>' + esc(new Date(h.created_at).toLocaleString('pt-BR')) + ' · ' + Object.keys(h.blocks || {}).length + ' blocos</small></div><div class="hist-actions"><button class="mini-btn" data-load>carregar</button><button class="mini-btn" data-del>excluir</button></div>';
+      d.innerHTML = '<div class="hist-info"><b>' + esc(h.niche) + '</b>' + (h.owner_name && state.me && h.owner !== state.me.id ? ' <span class="pin owner-pin">@' + esc(h.owner_name) + '</span>' : '') + '<small>' + esc(new Date(h.created_at).toLocaleString('pt-BR')) + ' · ' + Object.keys(h.blocks || {}).length + ' blocos</small></div><div class="hist-actions"><button class="mini-btn" data-load>carregar</button><button class="mini-btn" data-dup title="novo funil com os mesmos parâmetros (nicho, brief, persona, idiomas) — sem os resultados">⎘ duplicar</button><button class="mini-btn" data-del>excluir</button></div>';
       d.querySelector('[data-load]').onclick = function () { loadEntry(h); };
+      d.querySelector('[data-dup]').onclick = function () { duplicateEntry(h); };
       d.querySelector('[data-del]').onclick = function () { if (confirm('Excluir?')) deleteHistory(h.id).then(loadHistory); };
       el.appendChild(d);
     });
   }).catch(function () {});
+}
+function duplicateEntry(h) {
+  $$('.tab')[0].click();
+  const p = Object.assign({}, h.params || {}); delete p._agentFeedback; delete p._previousJson;
+  resetRun(); state.params = p;
+  // preenche o wizard com os parâmetros do funil original
+  const set = function (id, v) { const el = $(id); if (el && v != null) el.value = v; };
+  set('#niche', p.niche); set('#brief', p.brief || ''); set('#geoCountry', p.geoCountry); set('#campaignLang', p.campaignLang); set('#contentLang', p.contentLang); set('#flowLang', p.flowLang); set('#currency', p.currency); set('#persona', p.persona); set('#personaCustom', p.personaCustom || ''); set('#pageName', p.pageName || '');
+  ['#persona', '#brief'].forEach(function (id) { const el = $(id); if (el) el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input')); });
+  gotoStep(1);
+  toast('Funil duplicado: ajuste o que quiser e gere de novo');
 }
 function loadEntry(h) {
   $$('.tab')[0].click(); // volta pro criador
@@ -468,6 +557,12 @@ function wireOutputActions() {
     });
     if (!Object.keys(save).length) { toast('Nada para salvar.'); return; }
     saveHistory({ niche: state.params.niche, params: state.params, blocks: save }).then(function () { toast('Salvo no histórico ✓'); });
+  };
+  $('#zipBtn').onclick = function () {
+    const f = funnelFiles();
+    if (f.files.length <= 2) { toast('Nada pra zipar ainda.'); return; }
+    downloadBlob(makeZip(f.files), 'nexus-' + f.slug + '.zip');
+    toast('ZIP com ' + f.files.length + ' arquivos');
   };
   $('#downloadAll').onclick = function () {
     let n = 0;
@@ -592,7 +687,7 @@ function loadBlogs(afterRestore) {
     list.innerHTML = blogsCache.map(function (b) {
       const ok = b.last_ok ? ('✓ ' + esc(b.last_ok.user || '') + (b.last_ok.gridRest ? ' · grid REST' : ' · ⚠ sem grid REST') + ' · ' + esc(String(b.last_ok.at || '').slice(0, 16).replace('T', ' '))) : 'nunca testado';
       return '<div class="blog-row" data-id="' + esc(b.id) + '">' +
-        '<div class="blog-info"><b>' + esc(b.name) + '</b><span class="pin">' + esc(b.url) + '</span><small>usuário <b>' + esc(b.user) + '</b> · ' + ok + (b.defaultCategory ? ' · categoria ' + esc(b.defaultCategory) : '') + '</small><div class="blog-test-out"></div></div>' +
+        '<div class="blog-info"><b>' + esc(b.name) + '</b>' + (b.owner_name && !b.mine ? '<span class="pin owner-pin">@' + esc(b.owner_name) + '</span>' : '') + '<span class="pin">' + esc(b.url) + '</span><small>usuário <b>' + esc(b.user) + '</b> · ' + ok + (b.defaultCategory ? ' · categoria ' + esc(b.defaultCategory) : '') + '</small><div class="blog-test-out"></div></div>' +
         '<div class="blog-actions"><button class="mini-btn blog-test">🔌 testar</button><button class="mini-btn blog-del">✕ remover</button></div></div>';
     }).join('');
     $$('.blog-test').forEach(function (btn) {
@@ -636,7 +731,7 @@ function wirePublisher() {
     getBlogs().then(function (arr) {
       blogsCache = Array.isArray(arr) ? arr : [];
       const sel = $('#pubBlog');
-      sel.innerHTML = blogsCache.length ? blogsCache.map(function (b) { return '<option value="' + esc(b.id) + '">' + esc(b.name) + ' — ' + esc(b.url) + '</option>'; }).join('') : '<option value="">(nenhum blog cadastrado)</option>';
+      sel.innerHTML = blogsCache.length ? blogsCache.map(function (b) { return '<option value="' + esc(b.id) + '">' + esc(b.name) + ' — ' + esc(b.url) + (b.owner_name && !b.mine ? ' (@' + esc(b.owner_name) + ')' : '') + '</option>'; }).join('') : '<option value="">(nenhum blog cadastrado)</option>';
       $('#pubBlogHint').textContent = blogsCache.length ? 'o grid exige [MBZ] - Mirb Grid 1.4.0+ no blog' : 'cadastre blogs na aba 🌐 BLOGS';
       if (blogsCache.length) onPubBlogChange();
     });

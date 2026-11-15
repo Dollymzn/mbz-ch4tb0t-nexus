@@ -12,6 +12,7 @@
 
 import { state, esc, safeParse, toast, setResult, mergeArtifacts } from './state.js';
 import { runStream } from './api.js';
+import { emit as fxEmit } from './fx.js';
 
 /* ---------- catálogo de blocos (kind = como renderizar/exportar) ---------- */
 export const BLOCKS = [
@@ -171,6 +172,7 @@ export function makeRunView(container, opts) {
   function setStatus(card, st, label) {
     card.status = st;
     card.statusEl.className = 'block-status ' + st;
+    card.el.className = card.el.className.replace(/\bst-\w+/g, '').trim() + ' st-' + st;
     card.statusEl.innerHTML =
       st === 'loading' ? '<span class="spinner"></span> ' + (label ? esc(label) : 'gerando') :
       st === 'reviewing' ? '🔍 revisando' :
@@ -237,6 +239,7 @@ export function makeRunView(container, opts) {
     card.regenBtn.classList.remove('hidden');
   }
   function renderError(card, d) {
+    fxEmit('error', { block: card && card.block });
     card.preEl = null;
     setStatus(card, 'error');
     const dep = d && d.reason === 'dependency_failed';
@@ -333,10 +336,24 @@ export function makeRunView(container, opts) {
     freshPreview(card);
   }
   function onBlockDelta(d) { appendDelta(ensureCard(d.block), d.text); }
+  let runCost = 0;
+  function fmtUsd(v) { return v >= 1 ? '$' + v.toFixed(2) : v >= 0.01 ? '$' + v.toFixed(3) : '$' + v.toFixed(4); }
+  function showCost(card, d) {
+    if (typeof d.cost !== 'number') return;
+    let el = card.el.querySelector('.cost-pin');
+    if (!el) { el = document.createElement('span'); el.className = 'pin cost-pin'; el.title = 'custo estimado (preço de lista) · in/out tokens'; const t = card.el.querySelector('.block-title'); if (t) t.appendChild(el); }
+    const u = d.usage || {};
+    el.textContent = '≈ ' + fmtUsd(d.cost) + ((u.input_tokens || u.output_tokens) ? ' · ' + Math.round((u.input_tokens || 0) / 1000) + 'k/' + Math.round((u.output_tokens || 0) / 1000) + 'k' : '');
+    runCost += d.cost;
+    const tot = document.getElementById('runCost'); if (tot) { tot.textContent = '≈ ' + fmtUsd(runCost) + ' nesta run'; tot.classList.remove('hidden'); }
+  }
   function onBlockDone(d) {
+    fxEmit('block_done', { block: d.block });
     delete inFlight[d.block];
     storeResult(d);
     renderDone(ensureCard(d.block), d);
+    showCost(ensureCard(d.block), d);
+    if (d.cost != null) { const r = state.results[d.block]; if (r) { r.cost = d.cost; r.usage = d.usage; } }
     (DEPENDENTS[d.block] || []).forEach(function (dep) {
       const c = cards[dep];
       if (c && (c.status === 'done' || c.status === 'stale')) markStale(c);
@@ -355,6 +372,7 @@ export function makeRunView(container, opts) {
   }
   function onRunDone(d) {
     runDoneSeen = true;
+    fxEmit('run_done');
     (d.skipped || []).forEach(function (b) {
       if (cards[b]) renderError(cards[b], { reason: 'dependency_failed', message: 'dependência falhou', retryable: true });
     });
@@ -621,7 +639,12 @@ function sanitize(b, j, raw, ctx) {
   if (!j) j = safeParse(raw);
   if (!j) return '<pre>' + esc(raw || '') + '</pre>';
   try {
-    if (b === 'page_name' && j.names) return ulist(j.names);
+    if (b === 'page_name' && (j.fem || j.masc || j.marca || j.names)) {
+      if (!j.fem && !j.masc && !j.marca) return ulist(j.names);
+      return '<div class="name-groups">' + [['♀ mulheres', j.fem], ['♂ homens', j.masc], ['◆ marcas / neutros', j.marca]].map(function (g) {
+        return '<div class="name-group"><div class="name-group-head"><span>' + g[0] + '</span></div><div class="chips">' + (g[1] || []).map(function (n) { return '<span class="chip">' + esc(n) + '</span>'; }).join('') + '</div></div>';
+      }).join('') + '</div>';
+    }
     if (b === 'fb_images') {
       let h = '';
       if (j.profile) h += '<h4>📷 Foto de Perfil (1:1)</h4><div class="kv"><p>' + esc(j.profile.prompt || j.profile) + '</p></div>';
@@ -972,6 +995,33 @@ function downloadJson(obj, filename) {
 }
 
 // versão texto p/ copiar dos blocos 'text' — portado do v2 cleanText
+/* ---------- v4.2: ZIP do funil (todos os JSONs + textos + prompts numa pasta por nicho) ---------- */
+export function funnelFiles() {
+  const slug = (state.params.niche || 'funil').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'funil';
+  const files = [];
+  const p = Object.assign({}, state.params); delete p._agentFeedback; delete p._previousJson;
+  files.push({ name: slug + '/params.json', data: JSON.stringify(p, null, 2) });
+  if (state.artifacts && Object.keys(state.artifacts).length) files.push({ name: slug + '/artifacts.json', data: JSON.stringify(state.artifacts, null, 2) });
+  let readme = '# ' + (state.params.niche || 'funil') + '\n\nGerado pelo MBZ::CH4TB0T NEXUS em ' + new Date().toLocaleString('pt-BR') + '\n\n';
+  Object.keys(state.results).forEach(function (b) {
+    const r = state.results[b]; if (!r || !r.json) return;
+    const label = (BLOCKS.find(function (x) { return x.id === b; }) || {}).name || b;
+    readme += '- ' + label + ' → json/' + b + '.json' + (r.cost ? ' (≈$' + r.cost.toFixed(3) + ')' : '') + '\n';
+    files.push({ name: slug + '/json/' + b + '.json', data: JSON.stringify(exportJson(b, r.json), null, 2) });
+    try { const t = cleanText(b, r.json, r.raw); if (t && t.trim()) files.push({ name: slug + '/texto/' + b + '.txt', data: t }); } catch (e) { /* noop */ }
+    if (r.review) files.push({ name: slug + '/revisoes/' + b + '.json', data: JSON.stringify(r.review, null, 2) });
+  });
+  // prompts de imagem/vídeo em arquivos separados (1 por prompt) pra colar no Flow
+  ['image_prompts', 'creatives_prompt', 'video_prompts', 'fb_images'].forEach(function (b) {
+    const r = state.results[b]; if (!r || !r.json) return;
+    const t = cleanText(b, r.json, r.raw); if (!t) return;
+    t.split(/\n{2,}/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 40; }).forEach(function (pr, i) {
+      files.push({ name: slug + '/prompts/' + b + '-' + String(i + 1).padStart(2, '0') + '.txt', data: pr });
+    });
+  });
+  files.unshift({ name: slug + '/README.md', data: readme });
+  return { slug: slug, files: files };
+}
 export function cleanText(b, j, raw) {
   if (!j) return raw || '';
   try {

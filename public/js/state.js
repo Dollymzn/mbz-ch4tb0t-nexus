@@ -18,7 +18,8 @@ const K = {
 export const state = {
   cfg: null,                                    // /api/config
   model: localStorage.getItem(K.model) || '',   // id do modelo escolhido
-  accessPass: sessionStorage.getItem(K.pass) || '',
+  accessPass: localStorage.getItem(K.pass) || sessionStorage.getItem(K.pass) || '',
+  me: null,
   userKey: localStorage.getItem(K.key) || '',
   params: {},                                   // params do wizard (collectParams)
   artifacts: {},                                // cache de artifacts de TODO block_done
@@ -36,7 +37,7 @@ export function setUserKey(k) {
 }
 export function setAccessPass(p) {
   state.accessPass = p || '';
-  if (p) sessionStorage.setItem(K.pass, p);
+  try { if (p) localStorage.setItem(K.pass, p); else { localStorage.removeItem(K.pass); sessionStorage.removeItem(K.pass); } } catch (e) { /* noop */ }
 }
 
 /* ---------- artifacts / resultados ---------- */

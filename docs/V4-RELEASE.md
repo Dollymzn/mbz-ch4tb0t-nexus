@@ -247,3 +247,49 @@ compactam o título se vier longo; `postprocess/titles.js` normaliza espaços/re
 - `params.brief` vai no histórico junto com os outros parâmetros (duplicar funil no futuro já carrega o brief).
 - Próximo (depende do Frame): chave de API pessoal → Nexus como cliente MCP do Frame com o token guardado só no
   navegador de cada pessoa (ver mensagem enviada ao Marcelo).
+
+## 18. v4.2.0 — CYBERPUNK OVERDRIVE II · personas · nomes · login · extras
+
+### Visual (html[data-fx] = full|lite · botões FX e 🔊/🔇 no header)
+- `fx.js` reescrito: cena de fundo em canvas (grade neon em perspectiva + sol de linhas + chuva de glifos + partículas),
+  pausa com aba oculta, DPR ≤1.5. **Boot screen** (log de sistemas, barra, pulável; 1× por sessão). **Glitch**
+  periódico nos títulos (`.glitch[data-text]`). **Decode/scramble** do título a cada passo. **Sons WebAudio**
+  sintetizados (click, hover, blip por bloco, acorde na run, erro, boot) com mute persistido (`nexus_sfx`).
+- CSS: cursor custom (mira/seta), CRT (curvatura, flicker, aberração cromática, ruído), scanlines multiply, HUD com
+  cantos nos cards/passos (cor por estado: âmbar gerando, verde pronto, rosa erro), varredura no card em geração,
+  botões com brilho varrendo, topbar sticky com linha animada, barra com flicker, transição "terminal" entre passos.
+- **Lite** (`FX ▮▯▯` ou `prefers-reduced-motion`): sem CRT/ruído/glitch/grade; só partículas.
+- Eventos: `nexus:step` (wizard) e `nexus:event` {block_done|run_done|error|warn} (render) → fx.
+
+### Personas (prompts.js)
+- 41 personas, **todas com `voice` + `look`**, em 4 grupos (♀ 18 · ♂ 15 · ♥ casal 2 · ◆ marca/neutro 6).
+  Novas: fem irreverente/fitness/cozinha; masc sensual/romântico/místico/humor/gamer/cristão jovem; casal
+  apaixonado/cristão; marca sem rosto (canal), mensageiro anônimo, narrador documental.
+- `custom`: textarea (voz + visual) → `params.personaCustom`. Grupo marca injeta "SEM ROSTO" nos prompts.
+- `personaLine` carrega voice + look pra todos os blocos; hint do select mostra a voz.
+
+### Nomes de página
+- Sempre **3 mulheres · 3 homens · 3 marcas/neutros** (`{fem,masc,marca}`; `names` plano mantido). Botão **↻ mais**
+  por grupo (`nameGroup` + `nameAvoid` evita repetir). Clique no chip preenche o nome. `postprocess/page_name.js`.
+
+### Login (lib/users.js)
+- `users.json` no volume, senha scrypt, token HMAC stateless (30 dias; trocar senha derruba sessões), papéis
+  `master|gestor`. Bootstrap: `MASTER_USER/MASTER_PASSWORD` → `ACCESS_PASSWORD` legado → primeiro login cria o master.
+- Rotas: `POST /api/auth {user,password}` → token (header `x-access-pass`); `GET /api/me`; `POST /api/me/password`;
+  master: `GET/POST /api/users`, `POST /api/users/:id/password`, `POST /api/users/:id/active`.
+- **Ownership**: `owner` em blogs e histórico; gestor só vê/usa/apaga o seu (403 no resto); master vê tudo com badge
+  `@dono`; blogs/funis antigos migram pro master no boot. Backup/restore de blogs por dono.
+- UI: gate com usuário+senha (aviso de primeiro acesso), chip `★ teteu`/`@ana` no header → trocar senha / sair,
+  aba **USUÁRIOS** (master): criar, redefinir senha, desativar/reativar.
+
+### Extras
+- **ZIP do funil** (`zip.js`, store, sem dependência): `<nicho>/README.md`, params, artifacts, `json/`, `texto/`,
+  `prompts/` (1 arquivo por prompt de imagem/vídeo), `revisoes/`.
+- **Duplicar funil** no histórico: preenche o wizard com nicho/brief/persona/idiomas e volta ao passo 1.
+- **Custo US$** (`lib/pricing.js`, tabela por modelo, `MODEL_PRICES` override): `cost` em `block_done` (gen + crítico)
+  e `run_done`; badge `≈ $0.016 · 1k/1k` no card e total da run nas ações de saída. Estimativa (preço de lista).
+- **Lint Meta** (`lib/lint.js`, determinístico): atributo pessoal, garantia, prêmio/dinheiro, sexual, menores/"girls",
+  saúde, urgência falsa, marca de terceiros (soft), país (soft), CAPS, variáveis fora do lugar — em broadcast,
+  meta_copy, meta_onboard, títulos, comentário, onboard, sequence → `LINT META: "termo" em caminho — motivo` nos
+  warnings do card. `_warnings` de todo postprocess agora chegam ao card.
+- `ANTHROPIC_URL` sobrescrevível (testes E2E com Claude falso).
