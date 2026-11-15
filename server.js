@@ -17,6 +17,7 @@ const { readHistory, writeHistory } = require('./lib/history');
 const blogs = require('./lib/blogs');
 const { storageInfo } = require('./lib/datadir');
 const users = require('./lib/users');
+const frame = require('./lib/frame');
 const { WPClient, publishFunnel } = require('./lib/wp');
 
 const app = express();
@@ -114,6 +115,80 @@ app.post('/api/users/:id/password', (req, res) => {
 app.post('/api/users/:id/active', (req, res) => {
   if (!requireMaster(req, res)) return;
   try { res.json({ ok: true, user: users.setActive(req.params.id, !!(req.body || {}).active) }); } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ============================================================
+//  v4.3 — FRAME (Moodlr): o Nexus age no Frame com a chave pessoal de quem clicou
+//  (header x-frame-key; nunca guardada). Rotas exigem login do Nexus.
+// ============================================================
+function frameKey(req) { return String(req.get('x-frame-key') || '').trim(); }
+app.post('/api/frame/whoami', async (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  const key = frameKey(req); if (!key) return res.status(400).json({ error: 'sem chave do Frame' });
+  try {
+    const [me, uso] = await Promise.all([frame.frameCall(key, 'frame_quem_sou', {}, { timeoutMs: 20000 }), frame.frameCall(key, 'frame_uso_hoje', {}, { timeoutMs: 20000 }).catch(() => null)]);
+    res.json({ ok: true, me, uso });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+// proxy genérico (allowlist em lib/frame.js) — usado pra listar vozes/modelos/designs e pro Creative Studio
+app.post('/api/frame/call', async (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  const key = frameKey(req); if (!key) return res.status(400).json({ error: 'sem chave do Frame' });
+  const b = req.body || {};
+  try { res.json({ ok: true, result: await frame.frameCall(key, String(b.name || ''), b.arguments || {}) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+// envio dos criativos (SSE): criar_designs em lotes de 7 → narração opcional por design → (opcional) Creative Studio
+app.post('/api/frame/send', async (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  const key = frameKey(req); if (!key) return res.status(400).json({ error: 'sem chave do Frame' });
+  const b = req.body || {};
+  const items = Array.isArray(b.items) ? b.items.filter(x => x && x.briefing) : [];
+  if (!items.length) return res.status(400).json({ error: 'nada pra enviar' });
+  const idiomas = (Array.isArray(b.idiomas) ? b.idiomas : []).map(frame.frameLang).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).slice(0, 5);
+  const narr = b.narracao && typeof b.narracao === 'object' ? b.narracao : null;
+  const sse = openSSE(res);
+  const emit = (ev, d) => sse.send(ev, d);
+  const designs = []; const warnings = [];
+  try {
+    const chunks = []; for (let i = 0; i < items.length; i += 7) chunks.push(items.slice(i, i + 7));
+    emit('frame_progress', { step: 'start', total: items.length, lotes: chunks.length, idiomas });
+    for (let c = 0; c < chunks.length; c++) {
+      emit('frame_progress', { step: 'lote', lote: c + 1, lotes: chunks.length, n: chunks[c].length });
+      const args = { itens: chunks[c], modo: b.modo === 'camadas' ? 'camadas' : 'fundo_unico' };
+      if (idiomas.length) args.idiomas = idiomas;
+      if (b.referencia_design_id) args.referencia_design_id = b.referencia_design_id;
+      let r;
+      try { r = await frame.frameCall(key, 'frame_criar_designs', args); }
+      catch (e) { warnings.push('lote ' + (c + 1) + ': ' + e.message); emit('frame_progress', { step: 'warning', message: e.message }); continue; }
+      const ds = frame.extractDesigns(r);
+      if (!ds.length) warnings.push('lote ' + (c + 1) + ': o Frame respondeu sem ids de design');
+      if (r && (r.avisos || r.warnings)) [].concat(r.avisos || r.warnings).forEach(w => { warnings.push(String(w)); emit('frame_progress', { step: 'warning', message: String(w) }); });
+      ds.forEach((d, i) => { d.item = c * 7 + i + 1; designs.push(d); emit('frame_progress', { step: 'design', design: d }); });
+    }
+    // narração: roteiro i → design i (só os do idioma original; cópias traduzidas ficam sem, o Frame traduz textos mas não áudio)
+    if (narr && Array.isArray(narr.roteiros) && narr.roteiros.length && designs.length) {
+      const originals = designs.filter((d, i) => !idiomas.length || !d.idioma || d.idioma === idiomas[0] || i < items.length);
+      for (let i = 0; i < originals.length; i++) {
+        const d = originals[i]; const txt = narr.roteiros[i % narr.roteiros.length];
+        if (!txt) continue;
+        emit('frame_progress', { step: 'narrar', design: d.id, i: i + 1, n: originals.length });
+        try {
+          await frame.frameCall(key, 'frame_narrar', Object.assign({ design: d.id, roteiro: [String(txt).slice(0, 2400)], mesma_em_todas: true }, narr.voz ? { voz: narr.voz } : {}, narr.modelo ? { modelo: narr.modelo } : {}));
+          d.narrado = true;
+        } catch (e) { warnings.push('narração ' + d.id.slice(0, 8) + ': ' + e.message); emit('frame_progress', { step: 'warning', message: 'narração: ' + e.message }); }
+      }
+    }
+    if (b.creativeStudio && designs.length) {
+      try { await frame.frameCall(key, 'frame_enviar_creative_studio', { ids: designs.map(d => d.id).slice(0, 20) }); emit('frame_progress', { step: 'studio', n: Math.min(designs.length, 20) }); }
+      catch (e) { warnings.push('Creative Studio: ' + e.message); }
+    }
+    let uso = null; try { uso = await frame.frameCall(key, 'frame_uso_hoje', {}, { timeoutMs: 20000 }); } catch (e) { /* noop */ }
+    await emit('frame_done', { designs, warnings, uso }); // send é assíncrono: close() antes do flush descartaria o evento
+  } catch (e) {
+    await emit('frame_error', { message: e.message || String(e), designs, warnings });
+  }
+  sse.close();
 });
 
 // ---- /api/brief — v4.1.2: gera o BRIEF detalhado do nicho (opcional) ----
@@ -292,10 +367,12 @@ app.post('/api/publish', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// NEXUS_NO_LISTEN=1: testes importam o app sem abrir porta
+if (!process.env.NEXUS_NO_LISTEN) app.listen(PORT, () => {
   const photoKeys = ['PEXELS_API_KEY', 'PIXABAY_API_KEY', 'UNSPLASH_ACCESS_KEY'].filter(k => process.env[k]);
-  console.log(`MBZ::CH4TB0T NEXUS v4.2 ONLINE -> port ${PORT}`);
+  console.log(`MBZ::CH4TB0T NEXUS v4.3 ONLINE -> port ${PORT}`);
   const st = storageInfo();
   console.log(`DATA_DIR: ${st.dir} (${st.source}) ${st.persistent ? '' : '— ⚠ EFÊMERO: monte um Volume em /data e defina DATA_DIR=/data'}`);
   console.log(`Server key: ${SERVER_API_KEY ? 'YES' : 'NO'} | Auth: ${bootInfo.mode}${bootInfo.mode === 'first-run' ? ' (⚠ primeiro login cria o master)' : ''} · users: ${users.listUsers().length} | MAX_CONCURRENCY: ${process.env.MAX_CONCURRENCY || 3} | Fotos: ${photoKeys.length ? photoKeys.join('+') : 'NENHUMA key (grid sem fotos reais)'}`);
 });
+module.exports = app;

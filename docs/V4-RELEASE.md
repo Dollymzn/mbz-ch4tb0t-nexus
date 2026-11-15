@@ -293,3 +293,22 @@ compactam o título se vier longo; `postprocess/titles.js` normaliza espaços/re
   meta_copy, meta_onboard, títulos, comentário, onboard, sequence → `LINT META: "termo" em caminho — motivo` nos
   warnings do card. `_warnings` de todo postprocess agora chegam ao card.
 - `ANTHROPIC_URL` sobrescrevível (testes E2E com Claude falso).
+
+## 19. v4.3.0 — 🍒 Integração com o FRAME (Moodlr)
+- `lib/frame.js`: cliente MCP (JSON-RPC 2.0 `tools/call` em `FRAME_MCP_URL`, aceita resposta JSON ou SSE), allowlist de
+  ferramentas, `unwrap` (structuredContent → content[].text JSON → texto), erros 401/403/429 legíveis, timeout 4 min.
+  Helpers: `frameLang` (pt-BR→pt…), `frameFormat` (1080x1920→story…), `buildCreativeItems`, `extractDesigns`.
+- **Chave pessoal**: cada pessoa gera a sua no Frame e cola no chip do usuário (modal da conta) → `localStorage`
+  `nexus_frame_key`; vai no header `x-frame-key` e o servidor **nunca guarda**. "testar" chama `frame_quem_sou` +
+  `frame_uso_hoje` (mostra conectado como X · gasto/teto · designs do dia). Chip 🖼 no header quando conectada.
+- Rotas (login do Nexus + chave): `POST /api/frame/whoami`, `POST /api/frame/call` (proxy allowlisted),
+  `POST /api/frame/send` (SSE `frame_progress` {start|lote|design|warning|narrar|studio} / `frame_done` / `frame_error`).
+- **Card de Criativos → painel "🖼 ENVIAR PRO FRAME"**: formato (post/story/retrato/link), quantos, idiomas (até 5; o 1º é
+  o original, os outros viram cópias traduzidas), narração (voz principal do bloco Áudios + roteiro de cada áudio, 1
+  por design via `frame_narrar` mesma_em_todas), mandar pro Creative Studio. Monta o briefing de cada item com o prompt
+  da cena + headline da Copy Meta (ou do próprio prompt) + CTA no idioma, modo `fundo_unico` (textos editáveis).
+  Lotes de 7 (limite do Frame). Log ao vivo com link de cada design; chips dos designs no fim + uso do dia.
+- Testes: `test/frame.test.js` (fake MCP em JSON e SSE, allowlist, 401, idioma/formato/itens/extractDesigns, rota
+  `/api/frame/send` ponta a ponta: 2 lotes, 9 narrações, Creative Studio, eventos). `server.js` exporta o app e respeita
+  `NEXUS_NO_LISTEN=1` pra testes. **Bug corrigido de tabela**: `sse.send` é assíncrono — o último evento precisa de
+  `await` antes de `close()`.

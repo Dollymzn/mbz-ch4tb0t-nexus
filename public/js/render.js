@@ -11,7 +11,7 @@
 'use strict';
 
 import { state, esc, safeParse, toast, setResult, mergeArtifacts } from './state.js';
-import { runStream } from './api.js';
+import { runStream, frameSendStream } from './api.js';
 import { emit as fxEmit } from './fx.js';
 
 /* ---------- catálogo de blocos (kind = como renderizar/exportar) ---------- */
@@ -324,6 +324,7 @@ export function makeRunView(container, opts) {
     if (d.review || (state.results[d.block] && state.results[d.block].review)) showReview(card, d.review || state.results[d.block].review, false);
     revealActions(card);
     renderCardBody(card);
+    if (card.block === 'creatives_prompt') wireFramePanel(card);
   }
 
   /* ---------- handlers SSE (run principal) ---------- */
@@ -778,7 +779,7 @@ function sanitize(b, j, raw, ctx) {
       if (j.prompts) {
         const imgOnly = j.type === 'image_only';
         const head = '<span class="tag">' + esc(j.platform || '') + ' · ' + esc(j.size || '') + (imgOnly ? ' · APENAS IMAGEM' : ' · COMPLETO') + '</span>';
-        return head + j.prompts.map(function (p) {
+        return head + framePanelHtml(j) + j.prompts.map(function (p) {
           const id = ctx.ip.length; ctx.ip.push(p.prompt || '');
           return '<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>#' + (p.index || '') + '</b><button class="mini-btn ipcopy" data-ip="' + id + '">copiar</button></div>' + (p.headline ? '<br><b>Headline:</b> ' + esc(p.headline) : '') + (p.cta ? '<br><b>CTA:</b> ' + esc(p.cta) : '') + '<p>' + esc(p.prompt || '') + '</p></div>';
         }).join('');
@@ -995,6 +996,85 @@ function downloadJson(obj, filename) {
 }
 
 // versão texto p/ copiar dos blocos 'text' — portado do v2 cleanText
+/* ---------- v4.3: painel "Enviar pro Frame" no card de criativos ----------
+   Precisa da chave pessoal do Frame (chip no header). Monta os itens com os prompts +
+   headlines da copy Meta, idiomas, narração com a voz do bloco de áudios, e Creative Studio. */
+function framePanelHtml(j) {
+  const n = (j.prompts || []).length;
+  const hasKey = !!(window.__nexusFrameOk);
+  const audios = state.results.audios && state.results.audios.json;
+  const voice = audios && audios.voice_main ? audios.voice_main : null;
+  const lang = state.params.campaignLang || state.params.flowLang || 'pt-BR';
+  return '<div class="frame-panel' + (hasKey ? '' : ' nokey') + '">' +
+    '<div class="meta-head"><span class="tag">🖼 ENVIAR PRO FRAME · ' + n + ' criativo' + (n === 1 ? '' : 's') + '</span>' +
+    (hasKey ? '<button class="mini-btn frame-go" type="button">🚀 criar no Frame</button>' : '<small>🔑 cadastre sua chave do Frame no chip do usuário (header)</small>') + '</div>' +
+    '<div class="frame-opts">' +
+      '<label>formato <select class="frame-fmt"><option value="post">post 1080×1080</option><option value="story">story 1080×1920</option><option value="retrato">retrato 1080×1350</option><option value="link">link 1200×628</option></select></label>' +
+      '<label>quantos <input type="number" class="frame-n" min="1" max="14" value="' + Math.min(n, 7) + '"></label>' +
+      '<label>idiomas <input type="text" class="frame-langs" value="' + esc(lang) + '" placeholder="pt-BR, es, en (até 5)"></label>' +
+      '<label class="switch-inline"><input type="checkbox" class="frame-narr"' + (audios ? ' checked' : '') + (audios ? '' : ' disabled') + '><span class="slider"></span> narração' + (voice ? ' (' + esc(voice.name) + ')' : audios ? '' : ' (gere o bloco Áudios)') + '</label>' +
+      '<label class="switch-inline"><input type="checkbox" class="frame-studio"><span class="slider"></span> mandar pro Creative Studio</label>' +
+    '</div>' +
+    '<div class="frame-log hidden"></div><div class="frame-out"></div>' +
+    '<small class="muted">usa os prompts deste bloco + headlines da Copy Meta (se gerada) + CTA no idioma; cada idioma extra vira cópia traduzida. Conta na SUA cota do Frame.</small>' +
+  '</div>';
+}
+export function wireFramePanel(card) {
+  const panel = card.bodyEl.querySelector('.frame-panel'); if (!panel) return;
+  const go = panel.querySelector('.frame-go'); if (!go) return;
+  go.onclick = function () {
+    const j = card.json || {}; const prompts = j.prompts || [];
+    const fmt = panel.querySelector('.frame-fmt').value;
+    const n = Math.max(1, Math.min(14, parseInt(panel.querySelector('.frame-n').value, 10) || prompts.length));
+    const langs = panel.querySelector('.frame-langs').value.split(/[,\s]+/).filter(Boolean);
+    const copy = state.results.meta_copy && state.results.meta_copy.json;
+    const audios = state.results.audios && state.results.audios.json;
+    const wantNarr = panel.querySelector('.frame-narr').checked && audios;
+    const items = buildFrameItems(prompts.slice(0, n), copy && copy.headlines, langs[0] || state.params.campaignLang, fmt);
+    if (!items.length) { toast('Sem prompts pra enviar.'); return; }
+    const payload = { items: items, idiomas: langs, creativeStudio: panel.querySelector('.frame-studio').checked };
+    if (wantNarr) payload.narracao = { voz: audios.voice_main && audios.voice_main.id, modelo: 'eleven_v4', roteiros: (audios.audios || []).map(function (a) { return a.script; }) };
+    const log = panel.querySelector('.frame-log'); const out = panel.querySelector('.frame-out');
+    log.classList.remove('hidden'); log.innerHTML = ''; out.innerHTML = ''; go.disabled = true; go.textContent = '⏳ criando…';
+    const line = function (t) { const d = document.createElement('div'); d.innerHTML = t; log.appendChild(d); log.scrollTop = log.scrollHeight; };
+    line('▶ ' + items.length + ' itens · ' + (langs.join(', ') || 'idioma da campanha') + (wantNarr ? ' · narração' : ''));
+    frameSendStream(payload, {
+      onFrameProgress: function (e) {
+        if (e.step === 'lote') line('📦 lote ' + e.lote + '/' + e.lotes + ' (' + e.n + ' criativos) — o Frame gera fundo + textos, pode levar minutos…');
+        else if (e.step === 'design') line('✅ design <a href="' + esc(e.design.link) + '" target="_blank" rel="noopener">' + esc(e.design.nome || e.design.id.slice(0, 8)) + '</a>');
+        else if (e.step === 'narrar') line('🎙 narrando ' + e.i + '/' + e.n);
+        else if (e.step === 'studio') line('📤 ' + e.n + ' designs na fila do Creative Studio (abra o Frame → Exportar agora)');
+        else if (e.step === 'warning') line('⚠ ' + esc(e.message));
+      },
+      onFrameDone: function (d) {
+        go.disabled = false; go.textContent = '🚀 criar no Frame';
+        fxEmit('run_done');
+        out.innerHTML = '<div class="frame-designs">' + (d.designs || []).map(function (x) { return '<a class="chip" href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.nome || x.id.slice(0, 8)) + (x.narrado ? ' 🎙' : '') + '</a>'; }).join('') + '</div>' +
+          (d.uso && d.uso.gastoUsd ? '<small class="muted">uso hoje: $' + esc(d.uso.gastoUsd.voce) + ' / $' + esc(d.uso.tetoUsd && d.uso.tetoUsd.voce) + ' · designs ' + esc(d.uso.designsHoje) + '/' + esc(d.uso.limiteDesignsDia) + '</small>' : '') +
+          ((d.warnings || []).length ? '<div class="card-strip warn">' + d.warnings.map(esc).join('<br>') + '</div>' : '');
+        toast((d.designs || []).length + ' design(s) criados no Frame');
+      },
+      onFrameError: function (e) { go.disabled = false; go.textContent = '🚀 criar no Frame'; line('✕ ' + esc(e.message)); fxEmit('error'); toast('Frame: ' + e.message); }
+    });
+  };
+}
+const FRAME_CTA = { pt: 'Saiba mais', en: 'Learn more', es: 'Saber más', fr: 'En savoir plus', it: 'Scopri di più', de: 'Mehr erfahren', nl: 'Meer weten', pl: 'Dowiedz się', hi: 'और जानें', ro: 'Află mai mult' };
+function buildFrameItems(prompts, headlines, lang, fmt) {
+  const L = String(lang || 'pt').toLowerCase().split(/[-_]/)[0];
+  const hs = (headlines || []).filter(Boolean);
+  return prompts.map(function (p, i) {
+    const scene = String(p.prompt || p || '').trim(); if (!scene) return null;
+    const h = p.headline || (hs.length ? hs[i % hs.length] : '');
+    const cta = p.cta || FRAME_CTA[L] || 'Learn more';
+    const brief = ['Meta Ads creative for the niche "' + (state.params.niche || '') + '". Language: ' + L + '. Format: ' + fmt + '.',
+      'SCENE (background, no text drawn in the image): ' + scene,
+      h ? 'HEADLINE text (exact, editable, bold, high contrast, max 2 lines): "' + h + '"' : '',
+      'CTA button text (exact): "' + cta + '"',
+      'Leave clean space for the headline; no logos, no brand names, no country references, no payment cards, no nudity.'].filter(Boolean).join('\n');
+    return { briefing: brief.slice(0, 4000), formato: fmt, quantidade: 1, foto: true };
+  }).filter(Boolean);
+}
+
 /* ---------- v4.2: ZIP do funil (todos os JSONs + textos + prompts numa pasta por nicho) ---------- */
 export function funnelFiles() {
   const slug = (state.params.niche || 'funil').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'funil';

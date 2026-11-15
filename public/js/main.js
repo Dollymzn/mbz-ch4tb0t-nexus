@@ -7,7 +7,7 @@
 
 import { state, esc, toast, setModel, setUserKey, setAccessPass, resetRun, mergeArtifacts } from './state.js';
 import { initFX, startClock, initCyberpunk, bootScreen } from './fx.js';
-import { getConfig, auth, setBlogOwner, getUsers, createUser, setUserPassword, setUserActive, changeMyPassword, getHistory, saveHistory, deleteHistory, generateBrief, getStorage, backupBlogs, restoreBlogs, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
+import { getConfig, auth, getFrameKey, setFrameKey, frameWhoami, setBlogOwner, getUsers, createUser, setUserPassword, setUserActive, changeMyPassword, getHistory, saveHistory, deleteHistory, generateBrief, getStorage, backupBlogs, restoreBlogs, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
 import { makeRunView, exportJson, funnelFiles } from './render.js';
 import { makeZip, downloadBlob } from './zip.js';
 import { initWizard, collectParams, selectedBlocks, gotoStep } from './wizard.js';
@@ -139,6 +139,28 @@ function wireAccount() {
     });
   };
   if (me.role === 'master') { $('#tabUsers').classList.remove('hidden'); wireUsers(); }
+  wireFrameKey();
+}
+/* ---------- v4.3: chave pessoal do Frame (só neste navegador) ---------- */
+function wireFrameKey() {
+  const inp = $('#frameKey'), st = $('#frameKeyStatus'), chip = $('#frameChip'); if (!inp) return;
+  inp.value = getFrameKey();
+  const check = function (silent) {
+    const k = inp.value.trim(); setFrameKey(k);
+    if (!k) { window.__nexusFrameOk = false; st.textContent = 'sem chave — gere em Frame → configurações → chave de API pessoal'; chip.classList.add('hidden'); return; }
+    st.textContent = '⏳ validando…';
+    frameWhoami().then(function (r) {
+      if (r.ok && r.me) {
+        window.__nexusFrameOk = true;
+        st.innerHTML = '✅ conectado como <b>' + esc(r.me.nome || r.me.username) + '</b> (' + esc(r.me.empresa || '') + ')' + (r.uso && r.uso.gastoUsd ? ' · hoje $' + esc(r.uso.gastoUsd.voce) + '/$' + esc(r.uso.tetoUsd.voce) + ' · ' + esc(r.uso.designsHoje) + '/' + esc(r.uso.limiteDesignsDia) + ' designs' : '');
+        chip.classList.remove('hidden'); chip.title = 'Frame: ' + (r.me.nome || r.me.username);
+        if (!silent) toast('Frame conectado: ' + (r.me.nome || r.me.username));
+      } else { window.__nexusFrameOk = false; st.textContent = '✕ ' + (r.error || 'chave inválida'); chip.classList.add('hidden'); }
+    }).catch(function (e) { window.__nexusFrameOk = false; st.textContent = '✕ ' + e.message; });
+  };
+  $('#frameKeyTest').onclick = function () { check(false); };
+  $('#frameKeyClear').onclick = function () { inp.value = ''; check(true); };
+  if (inp.value) check(true);
 }
 /* ---------- usuários (master) ---------- */
 function wireUsers() {

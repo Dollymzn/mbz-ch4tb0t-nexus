@@ -1353,3 +1353,21 @@ html[data-fx="lite"] #fx{ opacity:.35 }
 
 .persona-row{ margin-top:14px }
 .persona-row .persona-card{ max-width:820px; margin:0 auto }
+
+/* ===== v4.3 — FRAME ===== */
+.frame-key-box{ text-align:left; margin-bottom:12px }
+.frame-key-box label{ display:block; font-family:var(--f-mono); font-size:11px; letter-spacing:2px; color:var(--cyan); margin-bottom:6px }
+.frame-key-box .suggest-row{ display:flex; gap:6px }
+.frame-key-box input{ flex:1 }
+.frame-key-box small{ display:block; margin-top:6px; font-size:11px }
+.modal-sep{ border:0; border-top:1px dashed rgba(255,255,255,.12); margin:14px 0 }
+.frame-chip{ color:var(--amber); border-color:rgba(255,204,51,.5); cursor:default }
+.frame-panel{ border:1px solid rgba(255,204,51,.35); background:rgba(255,204,51,.04); border-radius:10px; padding:12px 14px; margin:10px 0 14px }
+.frame-panel.nokey{ opacity:.75 }
+.frame-opts{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin:10px 0; font-family:var(--f-mono); font-size:12px }
+.frame-opts label{ display:inline-flex; align-items:center; gap:6px }
+.frame-opts input[type=number]{ width:64px } .frame-opts input[type=text]{ width:180px } .frame-opts select{ width:auto }
+.frame-log{ font-family:var(--f-mono); font-size:12px; line-height:1.6; max-height:220px; overflow:auto; background:rgba(0,0,0,.35); border-radius:8px; padding:8px 10px; margin:8px 0 }
+.frame-log a{ color:var(--cyan) }
+.frame-designs{ display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 }
+.frame-designs .chip{ text-decoration:none }

@@ -67,7 +67,11 @@ const EVENT_MAP = {
   // v4.1 Publisher (POST /api/publish)
   publish_progress: 'onPublishProgress',
   publish_done:     'onPublishDone',
-  publish_error:    'onPublishError'
+  publish_error:    'onPublishError',
+  // v4.3 Frame (POST /api/frame/send)
+  frame_progress:   'onFrameProgress',
+  frame_done:       'onFrameDone',
+  frame_error:      'onFrameError'
 };
 
 export function runStream(payload, handlers) {
@@ -203,6 +207,26 @@ export function testBlog(id) {
 }
 
 // POST /api/publish como stream SSE: handlers onPublishProgress / onPublishDone / onPublishError / onStreamEnd
+/* ---------- v4.3: Frame (chave pessoal só no navegador; vai no header x-frame-key) ---------- */
+export function getFrameKey() { try { return localStorage.getItem('nexus_frame_key') || ''; } catch (e) { return ''; } }
+export function setFrameKey(k) { try { if (k) localStorage.setItem('nexus_frame_key', k); else localStorage.removeItem('nexus_frame_key'); } catch (e) { /* noop */ } }
+function frameHeaders() { return Object.assign({}, authHeaders(), { 'x-frame-key': getFrameKey() }); }
+export function frameWhoami() { return fetch('/api/frame/whoami', { method: 'POST', headers: frameHeaders(), body: '{}' }).then(function (r) { return r.json(); }); }
+export function frameCall(name, args) { return fetch('/api/frame/call', { method: 'POST', headers: frameHeaders(), body: JSON.stringify({ name: name, arguments: args || {} }) }).then(function (r) { return r.json(); }); }
+export function frameSendStream(payload, handlers) {
+  const controller = new AbortController();
+  fetch('/api/frame/send', { method: 'POST', headers: frameHeaders(), body: JSON.stringify(payload), signal: controller.signal })
+    .then(function (res) {
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (!res.ok || ct.indexOf('text/event-stream') < 0) {
+        return res.text().then(function (txt) { let msg = 'Erro HTTP ' + res.status; try { const j = JSON.parse(txt); msg = j.error || j.message || msg; } catch (e) {} emit(handlers, 'onFrameError', { message: msg }); });
+      }
+      return consume(res.body, handlers, controller);
+    })
+    .catch(function (e) { if (controller.signal.aborted) { emit(handlers, 'onAbort', {}); return; } emit(handlers, 'onFrameError', { message: (e && e.message) || 'falha de rede' }); });
+  return controller;
+}
+
 export function publishStream(payload, handlers) {
   const controller = new AbortController();
   fetch('/api/publish', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload), signal: controller.signal })

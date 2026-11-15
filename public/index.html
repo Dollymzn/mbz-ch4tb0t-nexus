@@ -58,6 +58,7 @@
       <button class="tab hidden" data-tab="users" id="tabUsers"><i>👥</i> USUÁRIOS</button>
     </nav>
     <div class="status-cluster">
+      <span class="hud-btn frame-chip hidden" id="frameChip" title="Frame conectado">🖼</span>
       <span class="user-chip" id="userChip" title="clique pra trocar a senha / sair"></span>
       <button class="hud-btn no-sfx" id="fxBtn" type="button" title="efeitos">FX ▮▮▮</button>
       <button class="hud-btn no-sfx" id="sfxBtn" type="button" title="sons">🔊</button>
@@ -563,6 +564,13 @@
     <div class="modal-box">
       <h3>Minha conta</h3>
       <p class="step-help" id="pwWho"></p>
+      <div class="frame-key-box">
+        <label>🖼 Frame — chave de API pessoal</label>
+        <div class="suggest-row"><input type="password" id="frameKey" placeholder="frm_…" autocomplete="off"><button class="mini-btn" id="frameKeyTest" type="button">testar</button><button class="mini-btn ghost" id="frameKeyClear" type="button">limpar</button></div>
+        <small id="frameKeyStatus"></small>
+        <small class="muted">fica só neste navegador; cada envio usa a SUA conta e cota do Frame</small>
+      </div>
+      <hr class="modal-sep">
       <input type="password" id="pwCurrent" placeholder="senha atual" autocomplete="current-password">
       <input type="password" id="pwNew" placeholder="nova senha (6+)" autocomplete="new-password">
       <div class="modal-actions">
@@ -574,7 +582,7 @@
     </div>
   </div>
 
-  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.2 · <span id="modelFoot"></span></footer>
+  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.3 · <span id="modelFoot"></span></footer>
 </div>
 
 <!-- ===== API KEY MODAL ===== -->
