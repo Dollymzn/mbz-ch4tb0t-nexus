@@ -344,3 +344,10 @@ compactam o título se vier longo; `postprocess/titles.js` normaliza espaços/re
 - **Variar fonte do título** (ligado por padrão, só com molde de 1 layout): `frame_estilizar_textos` roda só a **fonte** por página — mantém a caixa e a animação. Faixa/contorno NÃO são variados pela API: são efeitos do Textbox (`atFx`) e o `faixa` do estilizar fica sobreposto. Hindi no lote → só fontes com devanágari; alfabeto não latino → não varia. Campo **fontes** restringe o rodízio.
 - Animação do CTA, fundo do título e contorno variam pelo **kit**: `criar_de_modelo` copia a animação (`anim`) de cada página do molde.
 - **Kits:** o campo molde sugere os designs da conta com "KIT" no nome (ex.: KIT CARTA SECRETA, 5 páginas). Texto 1 = título, último texto = botão. O fundo é gerado no formato do molde (kit 1080×1080 → post), ignorando o seletor do painel.
+
+## v4.3.4 — FRAME // UPLINK (console do Frame redesenhado)
+
+- O painel inline virou: botão **🖼 Frame** no header do card (ao lado de regenerar) + faixa de status no topo do card + **console em modal**.
+- Console: kits da conta como cards (designs com "KIT" no nome) ou "IA cria o layout", formato em segmentos (travado quando o kit define), slider de quantidade, chips de idiomas, opções em tiles com LED, cota do dia no header, estimativa de custo (imagem ~US$0,006, narração ~US$0,11/roteiro, tradução ~US$0,01/idioma + narração refeita) e pipeline visual por etapa com barra de progresso. Log recolhido (abre sozinho em aviso/erro).
+- O envio continua com o console fechado: a faixa mostra a etapa atual e, no fim, os designs criados.
+- Preferências (kit, formato, variar fonte, Studio, fontes) ficam salvas no navegador (`nexus_frame_cfg`).

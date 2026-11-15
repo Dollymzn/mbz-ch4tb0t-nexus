@@ -1,8 +1,49 @@
-# MBZ::CH4TB0T NEXUS v4.1.1
+# MBZ::CH4TB0T NEXUS v4.3.4
 
 Gerador completo de funis de arbitragem digital (Meta Ads -> Chatbot -> Blog AdX) 100% via API do Claude.
 Um único endpoint SSE gera todos os blocos do funil em paralelo, respeitando as dependências entre eles,
 com o texto de cada bloco chegando ao vivo na tela conforme o modelo escreve.
+
+## Novidades da v4.3 — Integração com o Frame (Moodlr)
+- **FRAME // UPLINK** (v4.3.4): botão **🖼 Frame** no header do card de criativos (ao lado de regenerar) e faixa no
+  topo do card abrem o console — escolha de kit, formato, quantidade, idiomas, opções, estimativa de custo e
+  pipeline visual do envio (molde → fundos → montagem → fontes → narração → tradução → Studio). Ele cria no Frame **um design com uma página por criativo**,
+  narra **um roteiro por página** (voz e roteiros do bloco Áudios, Eleven v4), traduz (uma cópia por idioma,
+  em grupos de 5) e opcionalmente manda pro Creative Studio.
+- **Chave pessoal do Frame** (`frm_…`): cada pessoa cadastra a sua no modal da conta (chip do usuário no
+  header). Fica **só no navegador** (localStorage), vai no header `x-frame-key` e o servidor nunca guarda.
+  Tudo conta na cota de quem criou a chave.
+- **Molde / kit de layouts** (v4.3.3): informe um design seu no campo "molde / kit" (o campo sugere os
+  designs com "KIT" no nome). Cada página com título + botão editáveis é um layout — fundo do título,
+  contorno, posição e animação do CTA ficam como foram montados no Frame — e os criativos alternam entre
+  as páginas. Convenção: texto 1 = título, último texto = botão. O fundo é gerado no formato do molde.
+- **Fundo sem texto** (v4.3.3): o bloco de criativos devolve o campo `scene` (a arte só como fundo) e é
+  ele que gera a imagem; em runs antigos o servidor remove as frases de headline/botão do prompt. O card
+  mostra o `scene` e o painel mostra quantos criativos vieram com ele.
+- **Fonte do título**: com molde de 1 layout, a fonte roda por página (mantém caixa e animação). Hindi no
+  lote → só fontes com devanágari; alfabeto não latino → não varia. Faixa/contorno/animação **não** são
+  variados pela API — variam pelo kit.
+- Limites do Frame tratados com fila e nova tentativa: 2 trabalhos de IA simultâneos, "Muitas chamadas…",
+  gravação recusada com o design aberto no editor (**feche o design no Frame durante o envio**).
+- A exportação dos MP4 roda no navegador: abrir o Frame (Início) e clicar **"Exportar agora"** com a aba
+  visível.
+- Detalhes: `docs/V4-RELEASE.md` (§ v4.3 em diante).
+
+## Novidades da v4.2 — Login, persistência e brief
+- **Login por usuário** (master / gestor): blogs e histórico são de cada pessoa; o master vê tudo, cria
+  usuários (aba USUÁRIOS) e transfere blogs entre donos. `MASTER_USER`/`MASTER_PASSWORD` são autoritativas
+  a cada boot (criam, redefinem a senha e reativam o master).
+- **Persistência**: dados em `DATA_DIR` → `RAILWAY_VOLUME_MOUNT_PATH` → `./data` (efêmero, com banner de
+  aviso). Blogs com senha de aplicação cifrada (AES-GCM) + backup/restauração cifrados.
+- **Passo 1 reordenado**: nicho → GEO/idiomas → nome da página (3 femininos / 3 masculinos / 3 marcas) →
+  persona (41 presets + personalizada) → **brief** opcional (bloqueado até escolher nome e persona).
+- **Crítico convergente**: análise exaustiva com checklist; "Aplicar sugestões" edita em vez de recriar.
+  Identidade visual com rubrica própria e campos novos.
+- **Áudios**: catálogo de 86 vozes ElevenLabs como sugestão (toda voz serve pra todos os idiomas), roteiros
+  com tags de emoção.
+- **Onboard do anúncio Click-to-Messenger**: texto (saudação + perguntas) e JSON `quick_replies`.
+- **Lint Meta** determinístico, estimativa de custo por bloco, ZIP do funil, títulos compactos.
+- **Visual cyberpunk** com animações e sons (botões pra reduzir efeitos e mutar).
 
 ## Novidades da v4.1.1 — App do nicho + CardLinks nos artigos
 - Bloco **App do nicho**: descobre o app oficial do nicho (Play Store; URL de busca quando não tem certeza do pacote)
@@ -120,16 +161,21 @@ npm test    # roda a suíte de testes (node --test, zero dependências extras)
 1. GitHub -> Railway -> Deploy from repo.
 2. Variables:
    - `ANTHROPIC_API_KEY` — chave da Anthropic (vazio = cada usuário insere a própria chave na interface).
-   - `ACCESS_PASSWORD` — senha de acesso à ferramenta (vazio = fica aberta sem senha).
-   - `DATA_DIR=/data` — pasta do histórico, deve apontar pro Volume.
-   - `MAX_CONCURRENCY` — opcional, limite de blocos rodando em paralelo por run (default: 3).
-   - `REVIEW_MODEL` — opcional, modelo usado pelo crítico do NEXUS Agent (default: melhor
-     modelo do catálogo — Opus 5.5).
+   - `MASTER_USER` / `MASTER_PASSWORD` — usuário master (senha com 6+ caracteres). Valem a cada boot.
+     Sem elas, `ACCESS_PASSWORD` (legado) vira o master "master"; sem nenhuma, o primeiro login cria o master.
+   - `SESSION_SECRET` — assina os tokens de sessão. Não troque depois (derruba as sessões).
+   - `BLOGS_SECRET` — cifra as senhas de aplicação dos blogs. Se mudar, re-cadastre os blogs.
+   - `DATA_DIR=/data` — pasta de dados (usuários, blogs, histórico); deve apontar pro Volume.
+   - `MAX_CONCURRENCY` — opcional, blocos em paralelo por run (default: 3).
+   - `REVIEW_MODEL` — opcional, modelo do crítico do NEXUS Agent (default: melhor do catálogo).
+   - `MODEL_PRICES` — opcional, preços por milhão de tokens pra estimativa de custo.
+   - `FRAME_MCP_URL` / `FRAME_TIMEOUT_MS` — opcionais (default `https://town.moodlr.digital/mcp` / 240000).
+     A chave do Frame **não** é variável de ambiente: cada pessoa cadastra a sua na interface.
    - **Fotos reais do grid MIRB** (opcional, qualquer UMA resolve; o app tenta na ordem):
      `PEXELS_API_KEY` (emissão de novas chaves pausada — só se já tiver),
      `PIXABAY_API_KEY` (grátis, aparece ao logar em https://pixabay.com/api/docs/),
      `UNSPLASH_ACCESS_KEY` (demo grátis 50 req/h em https://unsplash.com/developers).
-3. Settings -> Volumes -> montar em `/data`.
+3. Settings -> Volumes -> montar em `/data` (sem Volume os dados somem a cada deploy).
 4. Generate Domain.
 
 Veja `.env.example` para a lista completa de variáveis.
@@ -142,20 +188,29 @@ chatbot-nexus/
 ├── prompts.js               # system prompt + catálogos (personas, idiomas, moedas, países, criativos)
 ├── lib/
 │   ├── claude.js            # streamMessage/createMessage: stream Anthropic, retry 429/5xx, prompt caching
-│   ├── blocks.js             # buildBlockPrompt(block, params) + BLOCK_META (grafo, deps, maxTokens)
-│   ├── orchestrator.js      # scheduler topológico + semáforo MAX_CONCURRENCY + eventos SSE
+│   ├── blocks.js            # buildBlockPrompt(block, params) + BLOCK_META (grafo, deps, maxTokens) + rubricas
+│   ├── orchestrator.js      # scheduler topológico + semáforo MAX_CONCURRENCY + eventos SSE + crítico
 │   ├── sse.js               # writer SSE: backpressure, coalescing de deltas, keepalive
-│   ├── photos.js            # v4: resolvedor de fotos do grid (Pexels -> Pixabay -> Unsplash)
-│   ├── validate.js           # validateParams (bloqueia a run) + validateChatDrink (gera warnings)
-│   ├── history.js            # leitura/escrita atômica do histórico (cap de 200 entradas)
-│   └── postprocess/          # funções puras (json, params) => json: onboard, sequence, quiz, grid
+│   ├── frame.js             # v4.3: cliente MCP do Frame (allowlist, retry, cena limpa, fontes)
+│   ├── users.js             # v4.2: usuários (scrypt), tokens de sessão, master/gestor
+│   ├── blogs.js             # blogs por dono, senha cifrada, backup/restore
+│   ├── wp.js                # Publisher WordPress (P2 → grid → P1, CardLinks)
+│   ├── datadir.js           # resolve a pasta de dados (DATA_DIR → Volume → ./data)
+│   ├── voices.js            # catálogo de vozes ElevenLabs
+│   ├── lint.js              # Lint Meta determinístico
+│   ├── pricing.js           # estimativa de custo por bloco
+│   ├── photos.js            # resolvedor de fotos do grid (Pexels -> Pixabay -> Unsplash)
+│   ├── validate.js          # validateParams (bloqueia a run) + validateChatDrink (gera warnings)
+│   ├── history.js           # leitura/escrita atômica do histórico (por usuário)
+│   └── postprocess/         # funções puras (json, params) => json: onboard, sequence, quiz, grid, posts, áudios…
 ├── public/
 │   ├── index.html
 │   ├── style.css
-│   └── js/                   # state.js, api.js, wizard.js, render.js, fx.js, main.js (ES modules)
+│   └── js/                   # state, api, wizard, render, fx, anim, zip, main (ES modules)
 ├── docs/
 │   ├── ARCHITECTURE-V3.md    # contrato técnico oficial backend <-> frontend (referência de arquitetura)
-│   └── AGENT-V31.md          # contrato técnico do NEXUS Agent (crítico, review/regen, creative_analysis)
+│   ├── AGENT-V31.md          # contrato técnico do NEXUS Agent (crítico, review/regen, creative_analysis)
+│   └── V4-RELEASE.md         # notas de versão da v4 (até a v4.3.3)
 ├── test/                     # suíte node:test (node --test)
 └── .env.example
 ```

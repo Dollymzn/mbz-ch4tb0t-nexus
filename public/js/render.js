@@ -124,6 +124,7 @@ export function makeRunView(container, opts) {
           (kind === 'json-download' ? '<button class="mini-btn dl hidden" type="button">⬇ baixar .json</button>' : '') +
           '<button class="mini-btn cp hidden" type="button">copiar</button>' +
           (block !== 'review' ? '<button class="mini-btn review hidden" type="button">🔎 Analisar</button>' : '') +
+          (block === 'creatives_prompt' ? '<button class="mini-btn frame-open hidden" type="button" title="enviar os criativos pro Frame">🖼 Frame</button>' : '') +
           '<button class="mini-btn regen hidden" type="button">🔁 regenerar</button>' +
         '</div>' +
       '</div>' +
@@ -782,7 +783,7 @@ function sanitize(b, j, raw, ctx) {
         const head = '<span class="tag">' + esc(j.platform || '') + ' · ' + esc(j.size || '') + (imgOnly ? ' · APENAS IMAGEM' : ' · COMPLETO') + '</span>';
         return head + framePanelHtml(j) + j.prompts.map(function (p) {
           const id = ctx.ip.length; ctx.ip.push(p.prompt || '');
-          return '<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>#' + (p.index || '') + '</b><button class="mini-btn ipcopy" data-ip="' + id + '">copiar</button></div>' + (p.headline ? '<br><b>Headline:</b> ' + esc(p.headline) : '') + (p.cta ? '<br><b>CTA:</b> ' + esc(p.cta) : '') + '<p>' + esc(p.prompt || '') + '</p></div>';
+          return '<div class="kv"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>#' + (p.index || '') + '</b><button class="mini-btn ipcopy" data-ip="' + id + '">copiar</button></div>' + (p.headline ? '<br><b>Headline:</b> ' + esc(p.headline) : '') + (p.cta ? '<br><b>CTA:</b> ' + esc(p.cta) : '') + '<p>' + esc(p.prompt || '') + '</p>' + (p.scene ? '<p class="muted"><b>🖼 Fundo pro Frame (sem texto):</b> ' + esc(p.scene) + '</p>' : '') + '</div>';
         }).join('');
       }
     }
@@ -997,93 +998,203 @@ function downloadJson(obj, filename) {
 }
 
 // versão texto p/ copiar dos blocos 'text' — portado do v2 cleanText
-/* ---------- v4.3: painel "Enviar pro Frame" no card de criativos ----------
-   Precisa da chave pessoal do Frame (chip no header). Monta os itens com os prompts +
-   headlines da copy Meta, idiomas, narração com a voz do bloco de áudios, e Creative Studio. */
+/* ---------- v4.3.4: FRAME // UPLINK — faixa no card + botão no header + console em modal ----------
+   Precisa da chave pessoal do Frame (chip no header). A faixa mostra o estado; o console (modal) configura
+   kit/formato/idiomas/narração, estima o custo e acompanha o envio num pipeline visual. */
+const FRAME_FMTS = [['post', 'Post', '1080×1080'], ['retrato', 'Retrato', '1080×1350'], ['story', 'Story', '1080×1920'], ['link', 'Link', '1200×628']];
+const FRAME_LANGS = ['pt-BR', 'en-US', 'es', 'fr', 'it', 'de', 'nl', 'pl', 'ro', 'hi'];
+const FRAME_STEPS = [['molde', '🧩', 'Molde'], ['imagem', '🖼', 'Fundos'], ['montar', '📐', 'Montagem'], ['estilo', '🎨', 'Fontes'], ['narrar', '🎙', 'Narração'], ['traduzir', '🌐', 'Tradução'], ['studio', '📤', 'Studio']];
+function frameSceneCount(j) { return (j.prompts || []).filter(function (p) { return p && p.scene; }).length; }
 function framePanelHtml(j) {
-  const n = (j.prompts || []).length;
+  const n = (j.prompts || []).length; const ns = frameSceneCount(j);
   const hasKey = !!(window.__nexusFrameOk);
-  const audios = state.results.audios && state.results.audios.json;
-  const voice = audios && audios.voice_main ? audios.voice_main : null;
-  const lang = state.params.campaignLang || state.params.flowLang || 'pt-BR';
-  return '<div class="frame-panel' + (hasKey ? '' : ' nokey') + '">' +
-    '<div class="meta-head"><span class="tag">🖼 ENVIAR PRO FRAME · ' + n + ' criativo' + (n === 1 ? '' : 's') + '</span>' +
-    (hasKey ? '<button class="mini-btn frame-go" type="button">🚀 criar no Frame</button>' : '<small>🔑 cadastre sua chave do Frame no chip do usuário (header)</small>') + '</div>' +
-    '<div class="frame-opts">' +
-      '<label>formato <select class="frame-fmt"><option value="post">post 1080×1080</option><option value="story">story 1080×1920</option><option value="retrato">retrato 1080×1350</option><option value="link">link 1200×628</option></select></label>' +
-      '<label>quantos <input type="number" class="frame-n" min="1" max="' + Math.max(1, n) + '" value="' + n + '"></label>' +
-      '<label>idiomas <input type="text" class="frame-langs" value="' + esc(lang) + '" placeholder="pt-BR, es, en (até 5)"></label>' +
-      '<label class="switch-inline" title="usa a voz principal e os roteiros do bloco Áudios"><input type="checkbox" class="frame-narr"' + (audios ? ' checked' : '') + '><span class="slider"></span> <span class="frame-narr-label">narração' + (voice ? ' (' + esc(voice.name) + ')' : audios ? '' : ' — gere o bloco Áudios') + '</span></label>' +
-      '<label title="id ou link de um design SEU que serve de KIT DE LAYOUTS: cada página com título + botão editáveis é um layout (fundo do título, fonte, animação do CTA do jeito que você montou no Frame). Os criativos alternam entre as páginas — 5 páginas = 5 layouts rodando.">molde / kit <input type="text" class="frame-base" list="frameKits" placeholder="id/link — ou escolha um design seu com KIT no nome"><datalist id="frameKits"></datalist></label>' +
-      '<label class="switch-inline" title="com molde de 1 layout só: roda a fonte do título página a página (mantém a caixa e a animação). Fundo do título, contorno e animação do CTA variam pelo kit — monte páginas diferentes no molde."><input type="checkbox" class="frame-vary" checked><span class="slider"></span> variar fonte do título</label>' +
-      '<label title="opcional: restrinja às fontes que quiser (separadas por vírgula). Vazio = rodízio automático. Aceitas: Anton, Archivo Black, Baloo 2, Bangers, Bebas Neue, Cinzel, Exo 2, Fredoka, Jost, Kalam, Libre Franklin, Luckiest Guy, Manrope, Nunito, Oswald, Permanent Marker, Playfair Display, Plus Jakarta Sans, Poppins, Quicksand, Roboto, Russo One, Sora, Source Sans 3">fontes <input type="text" class="frame-fonts" placeholder="vazio = rodízio automático"></label>' +
-      '<label class="switch-inline" title="ligado: um design só, uma página por criativo (narração 1 roteiro por página). desligado: um design por criativo"><input type="checkbox" class="frame-single" checked><span class="slider"></span> um design com todas as páginas</label>' +
-      '<label class="switch-inline"><input type="checkbox" class="frame-studio"><span class="slider"></span> mandar pro Creative Studio</label>' +
-    '</div>' +
-    '<div class="frame-log hidden"></div><div class="frame-out"></div>' +
-    '<small class="muted">usa os prompts deste bloco + headlines da Copy Meta (se gerada) + CTA no idioma; cada idioma extra vira cópia traduzida. Conta na SUA cota do Frame.</small>' +
+  return '<div class="frame-strip' + (hasKey ? '' : ' nokey') + '">' +
+    '<div class="fs-glyph">🖼</div>' +
+    '<div class="fs-main"><div class="fs-title">FRAME <i>//</i> UPLINK</div>' +
+      '<div class="fs-sub">' + n + ' criativo' + (n === 1 ? '' : 's') + ' · ' +
+        (ns === n && n ? '<b class="ok">fundo sem texto ' + ns + '/' + n + '</b>' : '<b class="warn" title="sem o campo scene o servidor limpa as frases de headline/botão do prompt. 0 = deploy antigo: suba a versão nova e regere o bloco.">scene ' + ns + '/' + n + '</b>') +
+        '<span class="fs-state"></span></div></div>' +
+    '<div class="fs-out"></div>' +
+    '<button class="fs-open" type="button">' + (hasKey ? 'ABRIR CONSOLE' : '🔑 CADASTRAR CHAVE') + ' <span>▸</span></button>' +
   '</div>';
 }
 function refreshFramePanel(card) {
-  const old = card.bodyEl.querySelector('.frame-panel'); if (!old) return;
+  const old = card.bodyEl.querySelector('.frame-strip'); if (!old) return;
   const tmp = document.createElement('div'); tmp.innerHTML = framePanelHtml(card.json || {});
   old.replaceWith(tmp.firstElementChild); wireFramePanel(card);
 }
 export function wireFramePanel(card) {
-  const panel = card.bodyEl.querySelector('.frame-panel'); if (!panel) return;
-  const go = panel.querySelector('.frame-go'); if (!go) return;
-  // kits: designs da conta com "KIT" no nome viram sugestões do campo molde
-  const dl = panel.querySelector('datalist');
-  if (dl && !dl.dataset.loaded) {
-    dl.dataset.loaded = '1';
-    frameCall('frame_listar_designs', { busca: 'KIT' }).then(function (r) {
-      const list = (r && (r.designs || (r.result && r.result.designs))) || [];
-      dl.innerHTML = list.filter(function (d) { return d && d.id; }).map(function (d) { return '<option value="' + esc(d.id) + '">' + esc(d.nome || '') + ' · ' + esc(String(d.largura || '')) + '×' + esc(String(d.altura || '')) + '</option>'; }).join('');
-    }).catch(function () {});
+  const strip = card.bodyEl.querySelector('.frame-strip');
+  const hb = card.el.querySelector('.frame-open');
+  const hasKey = !!(window.__nexusFrameOk);
+  const open = function (e) { if (e) e.stopPropagation(); if (!window.__nexusFrameOk) { toast('Cadastre sua chave do Frame: clique no chip do seu usuário no topo.'); return; } openFrameConsole(card); };
+  if (hb) { hb.classList.toggle('hidden', !((card.json || {}).prompts || []).length); hb.classList.toggle('nokey', !hasKey); hb.onclick = open; }
+  if (!strip) return;
+  const b = strip.querySelector('.fs-open'); if (b) b.onclick = open;
+  frameStripSync(card);
+}
+function frameStripSync(card) {
+  const strip = card.bodyEl.querySelector('.frame-strip'); if (!strip) return;
+  const st = card.frameRun || {};
+  strip.classList.toggle('running', !!st.running);
+  const s = strip.querySelector('.fs-state'); if (s) s.textContent = st.running ? ' · ⏳ ' + (st.label || 'enviando…') : st.error ? ' · ✕ ' + st.error : '';
+  const o = strip.querySelector('.fs-out');
+  if (o) o.innerHTML = (st.designs || []).filter(function (x) { return x.papel !== 'molde'; }).map(function (x) { return '<a class="chip" href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.nome || x.id.slice(0, 8)) + (x.narrado ? ' 🎙' : '') + '</a>'; }).join('');
+}
+function frameCfg(card) {
+  if (card.frameCfg) return card.frameCfg;
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem('nexus_frame_cfg') || '{}'); } catch (e) { saved = {}; }
+  const n = ((card.json || {}).prompts || []).length;
+  card.frameCfg = { kit: saved.kit || '', fmt: saved.fmt || 'retrato', n: n, langs: [state.params.campaignLang || state.params.flowLang || 'pt-BR'], narr: true, vary: saved.vary !== false, studio: !!saved.studio, single: true, fonts: saved.fonts || '' };
+  return card.frameCfg;
+}
+function frameCfgSave(c) { try { localStorage.setItem('nexus_frame_cfg', JSON.stringify({ kit: c.kit, fmt: c.fmt, vary: c.vary, studio: c.studio, fonts: c.fonts })); } catch (e) { /* ok */ } }
+function openFrameConsole(card) {
+  let m = card.frameModal;
+  if (!m) {
+    m = document.createElement('div'); m.className = 'modal frame-console'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', 'Enviar criativos pro Frame');
+    document.body.appendChild(m); card.frameModal = m;
+    m.addEventListener('mousedown', function (e) { if (e.target === m) m.classList.add('hidden'); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !m.classList.contains('hidden')) m.classList.add('hidden'); });
   }
-  go.onclick = function () {
-    const j = card.json || {}; const prompts = j.prompts || [];
-    const fmt = panel.querySelector('.frame-fmt').value;
-    const n = Math.max(1, Math.min(prompts.length, parseInt(panel.querySelector('.frame-n').value, 10) || prompts.length));
-    const langs = panel.querySelector('.frame-langs').value.split(/[,\s]+/).filter(Boolean);
-    const copy = state.results.meta_copy && state.results.meta_copy.json;
-    const audios = state.results.audios && state.results.audios.json;
-    const wantNarr = panel.querySelector('.frame-narr').checked;
-    if (wantNarr && !audios) { toast('Narração precisa do bloco Áudios — gere ele (ou desligue a narração).'); return; }
-    const items = buildFrameItems(prompts.slice(0, n), copy && copy.headlines, langs[0] || state.params.campaignLang, fmt);
-    if (!items.length) { toast('Sem prompts pra enviar.'); return; }
-    const baseRaw = panel.querySelector('.frame-base').value.trim(); const baseM = baseRaw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-    const payload = { items: items, idiomas: langs, creativeStudio: panel.querySelector('.frame-studio').checked, single: panel.querySelector('.frame-single').checked, nome: (state.params.pageName || state.params.niche || 'NEXUS') + ' — criativos', baseDesign: baseM ? baseM[0] : null, variar: panel.querySelector('.frame-vary').checked, fontes: panel.querySelector('.frame-fonts').value.split(',').map(function (x) { return x.trim(); }).filter(Boolean) };
-    if (wantNarr) payload.narracao = { voz: audios.voice_main && audios.voice_main.id, modelo: 'eleven_v4', roteiros: (audios.audios || []).map(function (a) { return a.script; }) };
-    const log = panel.querySelector('.frame-log'); const out = panel.querySelector('.frame-out');
-    log.classList.remove('hidden'); log.innerHTML = ''; out.innerHTML = ''; go.disabled = true; go.textContent = '⏳ criando…';
-    const line = function (t) { const d = document.createElement('div'); d.innerHTML = t; log.appendChild(d); log.scrollTop = log.scrollHeight; };
-    line('▶ ' + items.length + ' itens · ' + (langs.join(', ') || 'idioma da campanha') + (wantNarr ? ' · narração' : ''));
-    frameSendStream(payload, {
-      onFrameProgress: function (e) {
-        if (e.step === 'lote') line('📦 lote ' + e.lote + '/' + e.lotes + ' (' + e.n + ' criativos) — o Frame gera fundo + textos, pode levar minutos…');
-        else if (e.step === 'molde') line('🧩 ' + esc(e.message));
-        else if (e.step === 'imagem') line('🖼 imagem ' + e.i + '/' + e.n + '…');
-        else if (e.step === 'estilo') line('🎨 variando a fonte do título em ' + e.n + ' páginas…');
-        else if (e.step === 'montar') line('📐 montando o design com ' + e.n + ' páginas…');
-        else if (e.step === 'traduzir') line('🌐 traduzindo pra ' + esc((e.idiomas || []).join(', ')) + '…');
-        else if (e.step === 'retry') line('⏳ Frame ocupado (' + esc(String(e.message).slice(0, 70)) + ') — tentando de novo em ' + Math.round(e.wait / 1000) + 's');
-        else if (e.step === 'design') line('✅ ' + (e.design.papel === 'molde' ? 'molde' : e.design.papel === 'traducao' ? 'tradução' : 'design') + ' <a href="' + esc(e.design.link) + '" target="_blank" rel="noopener">' + esc(e.design.nome || e.design.id.slice(0, 8)) + '</a>' + (e.design.paginas ? ' · ' + e.design.paginas + ' páginas' : ''));
-        else if (e.step === 'narrar') line('🎙 narrando' + (e.paginas ? ' ' + e.paginas + ' páginas (1 chamada)' : ' ' + e.i + '/' + e.n));
-        else if (e.step === 'studio') line('📤 ' + e.n + ' design(s) na fila do Creative Studio — cada página vira 1 MP4. Abra o Frame (Início) e clique "Exportar agora" com a aba visível até terminar.');
-        else if (e.step === 'warning') line('⚠ ' + esc(e.message));
-      },
-      onFrameDone: function (d) {
-        go.disabled = false; go.textContent = '🚀 criar no Frame';
-        fxEmit('run_done');
-        out.innerHTML = '<div class="frame-designs">' + (d.designs || []).map(function (x) { return '<a class="chip" href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.nome || x.id.slice(0, 8)) + (x.narrado ? ' 🎙' : '') + '</a>'; }).join('') + '</div>' +
-          (d.uso && d.uso.gastoUsd ? '<small class="muted">uso hoje: $' + esc(d.uso.gastoUsd.voce) + ' / $' + esc(d.uso.tetoUsd && d.uso.tetoUsd.voce) + ' · designs ' + esc(d.uso.designsHoje) + '/' + esc(d.uso.limiteDesignsDia) + '</small>' : '') +
-          ((d.warnings || []).length ? '<div class="card-strip warn">' + d.warnings.map(esc).join('<br>') + '</div>' : '');
-        toast((d.designs || []).length + ' design(s) criados no Frame');
-      },
-      onFrameError: function (e) { go.disabled = false; go.textContent = '🚀 criar no Frame'; line('✕ ' + esc(e.message)); fxEmit('error'); toast('Frame: ' + e.message); }
-    });
+  m.classList.remove('hidden');
+  if (!(card.frameRun && card.frameRun.running)) renderFrameConsole(card);
+}
+function renderFrameConsole(card) {
+  const m = card.frameModal; const c = frameCfg(card); const j = card.json || {};
+  const total = (j.prompts || []).length; c.n = Math.max(1, Math.min(total, c.n || total));
+  const audios = state.results.audios && state.results.audios.json;
+  const voice = audios && audios.voice_main ? audios.voice_main : null;
+  if (!audios) c.narr = false;
+  const base = c.langs[0];
+  const langSet = FRAME_LANGS.filter(function (l) { return l.split('-')[0] !== String(base).split('-')[0]; });
+  const tile = function (k, icon, title, sub, dis) {
+    return '<button type="button" class="fc-tile' + (c[k] ? ' on' : '') + '" data-k="' + k + '" aria-pressed="' + (c[k] ? 'true' : 'false') + '"' + (dis ? ' disabled' : '') + '><span class="fc-ti">' + icon + '</span><span class="fc-tt">' + title + '</span><span class="fc-ts">' + sub + '</span><span class="fc-led"></span></button>';
   };
+  m.innerHTML = '<div class="fc-box">' +
+    '<header class="fc-head"><div><div class="fc-kicker">MOODLR · CREATIVE PIPELINE</div><h3>FRAME <i>//</i> UPLINK</h3></div>' +
+      '<div class="fc-usage" aria-live="polite">consultando cota…</div><button type="button" class="fc-x" aria-label="fechar">✕</button></header>' +
+    '<div class="fc-grid">' +
+    '<div class="fc-cfg">' +
+      '<section><h4><span>01</span> LAYOUT</h4><div class="fc-kits"><button type="button" class="fc-kit' + (c.kit ? '' : ' on') + '" data-kit=""><b>✨ IA cria o layout</b><small>o criativo 1 vira o molde · todas as páginas iguais</small></button><div class="fc-kitlist"><small class="muted">buscando seus kits…</small></div></div>' +
+        '<input type="text" class="fc-kitid" placeholder="ou cole o id/link de qualquer design seu" value="' + esc(c.kit && !c.kitName ? c.kit : '') + '"></section>' +
+      '<section><h4><span>02</span> FORMATO <em class="fc-fmtnote"></em></h4><div class="fc-seg">' + FRAME_FMTS.map(function (f) { return '<button type="button" class="' + (c.fmt === f[0] ? 'on' : '') + '" data-fmt="' + f[0] + '"><b>' + f[1] + '</b><small>' + f[2] + '</small></button>'; }).join('') + '</div></section>' +
+      '<section><h4><span>03</span> QUANTOS <em><b class="fc-nv">' + c.n + '</b> de ' + total + '</em></h4><input type="range" class="fc-n" min="1" max="' + Math.max(1, total) + '" value="' + c.n + '" aria-label="quantos criativos"></section>' +
+      '<section><h4><span>04</span> IDIOMAS <em>cada extra vira uma cópia traduzida</em></h4><div class="fc-langs"><span class="fc-lang base" title="idioma do original">' + esc(base) + '</span>' + langSet.map(function (l) { return '<button type="button" class="fc-lang' + (c.langs.indexOf(l) > 0 ? ' on' : '') + '" data-lang="' + l + '">' + l + '</button>'; }).join('') + '</div></section>' +
+      '<section><h4><span>05</span> OPÇÕES</h4><div class="fc-tiles">' +
+        tile('narr', '🎙', 'Narração', audios ? (voice ? esc(voice.name) + ' · 1 roteiro por página' : '1 roteiro por página') : 'gere o bloco Áudios', !audios) +
+        tile('vary', '🎨', 'Variar fonte', 'rodízio no título') +
+        tile('studio', '📤', 'Creative Studio', 'entra na fila de export') +
+        tile('single', '📚', 'Um design só', 'uma página por criativo') +
+      '</div><details class="fc-adv"><summary>avançado</summary><label>fontes do rodízio <input type="text" class="fc-fonts" placeholder="vazio = automático · ex.: Anton, Bangers" value="' + esc(c.fonts) + '"></label></details></section>' +
+    '</div>' +
+    '<aside class="fc-side">' +
+      '<div class="fc-sum"></div>' +
+      '<button type="button" class="fc-go"><span>🚀 LANÇAR NO FRAME</span></button>' +
+      '<ol class="fc-pipe">' + FRAME_STEPS.map(function (s) { return '<li data-step="' + s[0] + '"><span class="fc-pi">' + s[1] + '</span><span class="fc-pl">' + s[2] + '</span><span class="fc-pv"></span><i class="fc-bar"><i></i></i></li>'; }).join('') + '</ol>' +
+      '<div class="fc-res"></div>' +
+      '<details class="fc-logwrap"><summary>log</summary><div class="fc-log"></div></details>' +
+    '</aside></div></div>';
+  const $ = function (s) { return m.querySelector(s); };
+  const sum = function () {
+    const kit = !!c.kit; const extra = c.langs.length - 1; const ns = frameSceneCount({ prompts: (j.prompts || []).slice(0, c.n) });
+    const cost = c.n * 0.006 + (c.narr ? c.n * 0.11 : 0) + extra * (0.01 + (c.narr ? c.n * 0.11 : 0));
+    $('.fc-sum').innerHTML =
+      '<div class="fc-stat"><b>' + c.n + '</b><span>página' + (c.n === 1 ? '' : 's') + '</span></div>' +
+      '<div class="fc-stat"><b>' + (kit ? (c.kitPages || '?') : 1) + '</b><span>layout' + ((kit ? c.kitPages : 1) === 1 ? '' : 's') + '</span></div>' +
+      '<div class="fc-stat"><b>' + c.langs.length + '</b><span>idioma' + (c.langs.length === 1 ? '' : 's') + '</span></div>' +
+      '<div class="fc-stat wide"><b>≈ US$ ' + cost.toFixed(2) + '</b><span>estimativa (imagem, narração, tradução)</span></div>' +
+      '<div class="fc-note ' + (ns === c.n ? 'ok' : 'warn') + '">' + (ns === c.n ? '✅ fundos sem texto (' + ns + '/' + c.n + ')' : '⚠ ' + ns + '/' + c.n + ' com scene — o resto usa o prompt limpo pelo servidor') + '</div>' +
+      (kit && !c.narr ? '<div class="fc-note warn">⚠ o kit tem narração própria e ela é copiada nas páginas — ligue a Narração pra refazer</div>' : '') +
+      (!c.single ? '<div class="fc-note warn">⚠ um design por criativo: kit, fontes e layouts alternados não se aplicam</div>' : '');
+    $('.fc-fmtnote').textContent = kit && c.single ? 'o kit define o formato' : '';
+    $('.fc-seg').classList.toggle('locked', kit && c.single);
+    frameCfgSave(c);
+  };
+  const pickKit = function (id, name, pages) {
+    c.kit = id || ''; c.kitName = name || ''; c.kitPages = pages || null;
+    m.querySelectorAll('.fc-kit').forEach(function (b) { b.classList.toggle('on', (b.dataset.kit || '') === c.kit); });
+    sum();
+    if (c.kit && !c.kitPages) frameCall('frame_ver_design', { design: c.kit, miniaturas: false }).then(function (r) { const d = r && r.result; if (d && d.paginas && c.kit === d.id) { c.kitPages = d.paginas.filter(function (p) { return (p.textos || []).length; }).length; sum(); } }).catch(function () {});
+  };
+  frameCall('frame_listar_designs', { busca: 'KIT' }).then(function (r) {
+    const list = ((r && r.result && r.result.designs) || []).filter(function (d) { return d && d.id; });
+    $('.fc-kitlist').innerHTML = list.length ? list.map(function (d) { return '<button type="button" class="fc-kit' + (c.kit === d.id ? ' on' : '') + '" data-kit="' + esc(d.id) + '" data-name="' + esc(d.nome || '') + '"><b>🧩 ' + esc(d.nome || d.id.slice(0, 8)) + '</b><small>' + esc(String(d.largura || '')) + '×' + esc(String(d.altura || '')) + ' · layouts alternados</small></button>'; }).join('') : '<small class="muted">nenhum design com "KIT" no nome — monte um no Frame (várias páginas, título + botão editáveis)</small>';
+    m.querySelectorAll('.fc-kitlist .fc-kit').forEach(function (b) { b.onclick = function () { $('.fc-kitid').value = ''; pickKit(b.dataset.kit, b.dataset.name); }; });
+    if (c.kit) pickKit(c.kit, c.kitName, c.kitPages);
+  }).catch(function () { $('.fc-kitlist').innerHTML = '<small class="muted">não consegui listar seus kits</small>'; });
+  frameCall('frame_uso_hoje', {}).then(function (r) { const u = r && r.result; $('.fc-usage').innerHTML = u && u.gastoUsd ? 'hoje <b>$' + esc(u.gastoUsd.voce) + '</b> / $' + esc(u.tetoUsd && u.tetoUsd.voce) + ' · designs <b>' + esc(u.designsHoje) + '</b>/' + esc(u.limiteDesignsDia) : ''; }).catch(function () { $('.fc-usage').textContent = ''; });
+  $('.fc-x').onclick = function () { m.classList.add('hidden'); };
+  m.querySelector('.fc-kit[data-kit=""]').onclick = function () { $('.fc-kitid').value = ''; pickKit(''); };
+  $('.fc-kitid').oninput = function () { const mm = this.value.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i); if (mm) pickKit(mm[0].toLowerCase()); else if (!this.value.trim() && !c.kitName) pickKit(''); };
+  m.querySelectorAll('.fc-seg button').forEach(function (b) { b.onclick = function () { c.fmt = b.dataset.fmt; m.querySelectorAll('.fc-seg button').forEach(function (x) { x.classList.toggle('on', x === b); }); sum(); }; });
+  $('.fc-n').oninput = function () { c.n = parseInt(this.value, 10) || 1; $('.fc-nv').textContent = c.n; sum(); };
+  m.querySelectorAll('button.fc-lang').forEach(function (b) { b.onclick = function () { const l = b.dataset.lang; const i = c.langs.indexOf(l); if (i > 0) c.langs.splice(i, 1); else c.langs.push(l); b.classList.toggle('on', i <= 0); sum(); }; });
+  m.querySelectorAll('.fc-tile').forEach(function (b) { b.onclick = function () { const k = b.dataset.k; c[k] = !c[k]; b.classList.toggle('on', c[k]); b.setAttribute('aria-pressed', c[k] ? 'true' : 'false'); sum(); }; });
+  $('.fc-fonts').oninput = function () { c.fonts = this.value; frameCfgSave(c); };
+  sum();
+  $('.fc-go').onclick = function () { frameLaunch(card); };
+}
+function frameLaunch(card) {
+  const m = card.frameModal; const c = frameCfg(card); const j = card.json || {};
+  const $ = function (s) { return m.querySelector(s); };
+  const copy = state.results.meta_copy && state.results.meta_copy.json;
+  const audios = state.results.audios && state.results.audios.json;
+  const kit = c.single ? c.kit : '';
+  const items = buildFrameItems((j.prompts || []).slice(0, c.n), copy && copy.headlines, c.langs[0], c.fmt);
+  if (!items.length) { toast('Sem prompts pra enviar.'); return; }
+  const payload = { items: items, idiomas: c.langs, creativeStudio: c.studio, single: c.single, nome: (state.params.pageName || state.params.niche || 'NEXUS') + ' — criativos', baseDesign: kit || null, variar: c.vary, fontes: c.fonts.split(',').map(function (x) { return x.trim(); }).filter(Boolean) };
+  if (c.narr && audios) payload.narracao = { voz: audios.voice_main && audios.voice_main.id, modelo: 'eleven_v4', roteiros: (audios.audios || []).map(function (a) { return a.script; }) };
+  const go = $('.fc-go'); const log = $('.fc-log'); const res = $('.fc-res'); const pipe = $('.fc-pipe');
+  const run = card.frameRun = { running: true, designs: [], label: 'iniciando…' };
+  m.querySelector('.fc-box').classList.add('running'); go.disabled = true; go.querySelector('span').textContent = '⏳ TRANSMITINDO…';
+  log.innerHTML = ''; res.innerHTML = ''; pipe.classList.add('live');
+  pipe.querySelectorAll('li').forEach(function (li) { li.className = ''; li.querySelector('.fc-pv').textContent = ''; li.querySelector('.fc-bar i').style.width = '0'; });
+  const line = function (t) { const d = document.createElement('div'); d.innerHTML = t; log.appendChild(d); log.scrollTop = log.scrollHeight; };
+  const order = FRAME_STEPS.map(function (s) { return s[0]; });
+  const step = function (id, val, pct) {
+    const k = order.indexOf(id);
+    pipe.querySelectorAll('li').forEach(function (li, i) { if (i < k && !li.classList.contains('done')) li.className = li.classList.contains('active') ? 'done' : 'skip'; if (i < k && li.classList.contains('done')) li.querySelector('.fc-bar i').style.width = '100%'; });
+    const li = pipe.querySelector('li[data-step="' + id + '"]'); if (!li) return;
+    li.className = 'active'; if (val != null) li.querySelector('.fc-pv').textContent = val; if (pct != null) li.querySelector('.fc-bar i').style.width = pct + '%';
+    run.label = li.querySelector('.fc-pl').textContent + (val ? ' ' + val : ''); frameStripSync(card);
+  };
+  const finish = function () { pipe.querySelectorAll('li').forEach(function (li) { li.className = li.classList.contains('active') || li.classList.contains('done') ? 'done' : 'skip'; if (li.classList.contains('done')) li.querySelector('.fc-bar i').style.width = '100%'; }); };
+  let imgs = 0;
+  line('▶ ' + items.length + ' criativos · ' + c.langs.join(', ') + (payload.narracao ? ' · narração' : '') + (kit ? ' · kit' : ''));
+  step('molde');
+  frameSendStream(payload, {
+    onFrameProgress: function (e) {
+      if (e.step === 'lote') { step('imagem', e.lote + '/' + e.lotes, Math.round(100 * (e.lote - 1) / e.lotes)); line('📦 lote ' + e.lote + '/' + e.lotes + ' (' + e.n + ' criativos)…'); }
+      else if (e.step === 'molde') { line('🧩 ' + esc(e.message)); }
+      else if (e.step === 'imagem') { imgs = Math.max(imgs, e.i); step('imagem', imgs + '/' + e.n, Math.round(100 * (imgs - 1) / e.n)); }
+      else if (e.step === 'montar') { step('montar', e.n + ' pág.'); line('📐 montando o design com ' + e.n + ' páginas…'); }
+      else if (e.step === 'estilo') { step('estilo', e.n + ' pág.'); line('🎨 variando a fonte do título…'); }
+      else if (e.step === 'narrar') { step('narrar', e.paginas ? e.paginas + ' roteiros' : e.i + '/' + e.n); line('🎙 narrando' + (e.paginas ? ' ' + e.paginas + ' páginas' : ' ' + e.i + '/' + e.n)); }
+      else if (e.step === 'traduzir') { step('traduzir', (e.idiomas || []).join(' ')); line('🌐 traduzindo pra ' + esc((e.idiomas || []).join(', ')) + '…'); }
+      else if (e.step === 'studio') { step('studio', e.n + ' design(s)'); line('📤 ' + e.n + ' design(s) na fila do Creative Studio.'); }
+      else if (e.step === 'retry') line('⏳ Frame ocupado (' + esc(String(e.message).slice(0, 70)) + ') — de novo em ' + Math.round(e.wait / 1000) + 's');
+      else if (e.step === 'design') line('✅ ' + (e.design.papel || 'design') + ' <a href="' + esc(e.design.link) + '" target="_blank" rel="noopener">' + esc(e.design.nome || e.design.id.slice(0, 8)) + '</a>');
+      else if (e.step === 'warning') { line('⚠ ' + esc(e.message)); m.querySelector('.fc-logwrap').open = true; }
+    },
+    onFrameDone: function (d) {
+      finish(); run.running = false; run.designs = d.designs || []; frameStripSync(card);
+      m.querySelector('.fc-box').classList.remove('running'); go.disabled = false; go.querySelector('span').textContent = '🚀 LANÇAR DE NOVO';
+      fxEmit('run_done');
+      const shown = run.designs.filter(function (x) { return x.papel !== 'molde'; });
+      res.innerHTML = '<div class="fc-done">TRANSMISSÃO CONCLUÍDA</div>' + shown.map(function (x) { return '<a class="fc-design" href="' + esc(x.link) + '" target="_blank" rel="noopener"><b>' + esc(x.nome || x.id.slice(0, 8)) + '</b><small>' + (x.papel === 'traducao' ? 'tradução' : (x.paginas ? x.paginas + ' páginas' : 'design')) + (x.narrado ? ' · 🎙 narrado' : '') + '</small><span>abrir ↗</span></a>'; }).join('') +
+        (c.studio ? '<div class="fc-note warn">📤 Pra virar MP4: abra o Frame (Início) e clique "Exportar agora" com a aba visível até terminar.</div>' : '') +
+        ((d.warnings || []).length ? '<div class="fc-note warn">' + d.warnings.map(esc).join('<br>') + '</div>' : '');
+      if (d.uso && d.uso.gastoUsd) m.querySelector('.fc-usage').innerHTML = 'hoje <b>$' + esc(d.uso.gastoUsd.voce) + '</b> / $' + esc(d.uso.tetoUsd && d.uso.tetoUsd.voce) + ' · designs <b>' + esc(d.uso.designsHoje) + '</b>/' + esc(d.uso.limiteDesignsDia);
+      toast(shown.length + ' design(s) criados no Frame');
+    },
+    onFrameError: function (e) {
+      run.running = false; run.error = e.message; frameStripSync(card);
+      m.querySelector('.fc-box').classList.remove('running'); go.disabled = false; go.querySelector('span').textContent = '🚀 TENTAR DE NOVO';
+      const a = pipe.querySelector('li.active'); if (a) a.className = 'fail';
+      line('✕ ' + esc(e.message)); m.querySelector('.fc-logwrap').open = true; res.innerHTML = '<div class="fc-note err">✕ ' + esc(e.message) + '</div>'; fxEmit('error'); toast('Frame: ' + e.message);
+    }
+  });
 }
 const FRAME_CTA = { pt: 'Saiba mais', en: 'Learn more', es: 'Saber más', fr: 'En savoir plus', it: 'Scopri di più', de: 'Mehr erfahren', nl: 'Meer weten', pl: 'Dowiedz się', hi: 'और जानें', ro: 'Află mai mult' };
 function buildFrameItems(prompts, headlines, lang, fmt) {
