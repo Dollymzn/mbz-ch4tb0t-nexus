@@ -245,3 +245,12 @@ test('v4.2 — personas: todas com voice+look, grupos, custom e marca sem rosto;
   assert.deepEqual(out.names, ['A', 'B', 'C', 'E', 'Love Message']);
   assert.deepEqual(fixPageName({ names: ['X', 'Y'] }).fem, ['X', 'Y'], 'formato antigo compat');
 });
+
+test('v4.2.1 — brief: nome da página tem precedência; gerador não inventa nome e respeita nome/persona já escolhidos', () => {
+  const { buildBriefPrompt } = require('../lib/blocks');
+  assert.ok(buildBlockPrompt('onboard', { niche: 'x', pageName: 'The Love Note', brief: 'PERSONA: Aurora del Amor' }).includes('prevalecem o NOME DA PÁGINA'));
+  const a = buildBriefPrompt({ niche: 'Carta de Amor', campaignLang: 'en-US', pageName: 'The Love Note', personaLabel: 'Feminina romântica', persona: 'fem_romantica', personaVoice: 'doce' });
+  assert.ok(a.includes('NOME DA PÁGINA JÁ DEFINIDO: "The Love Note"') && a.includes('PERSONA JÁ ESCOLHIDA: Feminina romântica — doce') && a.includes('SEM nome próprio inventado') && a.includes('instruções em PORTUGUÊS'));
+  const b = buildBriefPrompt({ niche: 'x', campaignLang: 'en-US' });
+  assert.ok(b.includes('NÃO invente nome próprio') && !b.includes('PERSONA JÁ ESCOLHIDA'));
+});

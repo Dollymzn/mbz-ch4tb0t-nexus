@@ -128,7 +128,7 @@ app.post('/api/brief', async (req, res) => {
   const model = MODELS.some(m => m.id === b.model) ? b.model : DEFAULT_MODEL;
   try {
     const { buildBriefPrompt } = require('./lib/blocks');
-    const out = await createMessage({ apiKey, model, system: buildSystemPrompt(), user: buildBriefPrompt({ niche, campaignLang: b.campaignLang, contentLang: b.contentLang, geoCountry: b.geoCountry, tone: b.tone, notes: b.notes }), maxTokens: 4000, timeoutMs: 90000 });
+    const out = await createMessage({ apiKey, model, system: buildSystemPrompt(), user: buildBriefPrompt({ niche, campaignLang: b.campaignLang, contentLang: b.contentLang, geoCountry: b.geoCountry, tone: b.tone, notes: b.notes, pageName: String(b.pageName || '').trim(), persona: b.persona, personaLabel: b.personaLabel, personaVoice: (PERSONAS.find(x => x.id === b.persona) || {}).voice }), maxTokens: 4000, timeoutMs: 90000 });
     const text = String(out && (out.text || out) || '').replace(/^```[a-z]*\n?|```$/g, '').trim();
     res.json({ ok: true, brief: text, model });
   } catch (e) { res.status(500).json({ error: e.message || String(e) }); }

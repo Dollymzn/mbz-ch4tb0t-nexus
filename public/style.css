@@ -1344,3 +1344,9 @@ html[data-fx="lite"] #fx{ opacity:.35 }
 
 .owner-sel{ display:inline-flex; align-items:center; gap:6px; font-family:var(--f-mono); font-size:11px; color:var(--muted); margin-left:8px }
 .owner-sel select{ width:auto; padding:3px 8px; font-size:11px }
+
+.brief-tip{ font-family:var(--f-mono); font-size:11px; color:var(--muted); margin-top:8px; line-height:1.5 }
+.brief-tip b{ color:var(--cyan) }
+
+.brief-body.locked textarea{ opacity:.45; cursor:not-allowed }
+.brief-body.locked .mini-btn:disabled{ opacity:.4; cursor:not-allowed }

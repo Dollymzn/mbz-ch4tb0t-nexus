@@ -615,12 +615,24 @@ function wireBrief() {
   tg.addEventListener('click', function () { body.classList.toggle('hidden'); });
   ta.addEventListener('input', refresh);
   $('#briefClear').addEventListener('click', function () { ta.value = ''; refresh(); });
+  // v4.2.1: brief só com nicho + NOME DA PÁGINA definidos (o brief é escrito pra esse nome)
+  const gate = function () {
+    const ok = !!$('#niche').value.trim() && !!$('#pageName').value.trim();
+    const g = $('#briefGen'); g.disabled = !ok; g.title = ok ? '' : 'escolha o nome da página primeiro';
+    ta.disabled = !ok; ta.placeholder = ok ? ta.getAttribute('data-ph') : '🔒 Escolha o NICHO e o NOME DA PÁGINA antes — o brief é escrito pra esse nome.';
+    body.classList.toggle('locked', !ok);
+  };
+  ta.setAttribute('data-ph', ta.placeholder);
+  ['#niche', '#pageName'].forEach(function (id) { $(id).addEventListener('input', gate); });
+  document.addEventListener('click', function (e) { if (e.target.closest('#nameChips .chip')) setTimeout(gate, 0); });
+  gate();
   $('#briefGen').addEventListener('click', function () {
     const niche = $('#niche').value.trim();
     if (!niche) { toast('Digite o nicho primeiro.'); return; }
+    if (!$('#pageName').value.trim()) { toast('Escolha o nome da página primeiro — o brief é escrito pra ele.'); return; }
     if (ta.value.trim() && !confirm('Substituir o brief atual pelo gerado?')) return;
     const btn = $('#briefGen'); btn.disabled = true; btn.textContent = '⏳ gerando…';
-    generateBrief({ niche: niche, campaignLang: $('#campaignLang').value, contentLang: $('#contentLang').value, geoCountry: $('#geoCountry').value, tone: $('#briefTone').value.trim(), model: state.model })
+    generateBrief({ niche: niche, campaignLang: $('#campaignLang').value, contentLang: $('#contentLang').value, geoCountry: $('#geoCountry').value, tone: $('#briefTone').value.trim(), model: state.model, pageName: $('#pageName').value.trim(), persona: $('#persona').value, personaLabel: ($('#persona').selectedOptions[0] || {}).text || '' })
       .then(function (r) {
         if (r && r.brief) { ta.value = r.brief; refresh(); body.classList.remove('hidden'); toast('Brief gerado — revise e ajuste antes de rodar'); }
         else toast('Falha ao gerar brief: ' + ((r && r.error) || '?'));
