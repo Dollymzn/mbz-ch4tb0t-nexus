@@ -69,3 +69,15 @@ test('users — bootstrap aceita senha curta do ambiente (legado) e nunca lança
   const b = fresh({ MASTER_USER: '!!!', MASTER_PASSWORD: 'x' });
   assert.equal(b.users.bootstrap().mode, 'first-run', 'nome inválido → first-run, sem crash');
 });
+
+test('users — MASTER_* manda sempre: cria o master mesmo com users.json existente e re-sincroniza a senha', () => {
+  const a = fresh({ ACCESS_PASSWORD: 'abc' });
+  assert.equal(a.users.bootstrap().mode, 'legacy');
+  process.env.MASTER_USER = 'teteu'; process.env.MASTER_PASSWORD = 'nova123';
+  assert.equal(a.users.bootstrap().mode, 'env+users');
+  assert.ok(a.users.login('teteu', 'nova123') && a.users.login('master', 'abc'), 'os dois masters entram');
+  process.env.MASTER_PASSWORD = 'outra123';
+  assert.equal(a.users.bootstrap().mode, 'env-sync');
+  assert.equal(a.users.login('teteu', 'nova123'), null); assert.ok(a.users.login('teteu', 'outra123'));
+  assert.equal(a.users.bootstrap().mode, 'users', 'sem mudança → nada a fazer');
+});

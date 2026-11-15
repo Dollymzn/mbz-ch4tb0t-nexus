@@ -62,7 +62,7 @@ function isMaster(req) { const u = authUser(req); return !!(u && u.role === 'mas
 function canSee(req, ownerId) { const u = authUser(req); return !!u && (u.role === 'master' || !ownerId || ownerId === u.id); }
 function requireMaster(req, res) { if (!checkPassword(req)) { res.status(401).json({ error: 'Acesso negado.' }); return false; } if (!isMaster(req)) { res.status(403).json({ error: 'Só o master pode fazer isso.' }); return false; } return true; }
 const bootInfo = users.bootstrap();
-if (bootInfo.created || bootInfo.mode === 'users') { const mid = users.masterId(); if (mid) { const n = blogs.claimOrphans(mid); if (n) console.log(`migração: ${n} blog(s) sem dono → master`); } }
+if (bootInfo.created || bootInfo.mode === 'users' || bootInfo.mode === 'env-sync') { const mid = users.masterId(); if (mid) { const n = blogs.claimOrphans(mid); if (n) console.log(`migração: ${n} blog(s) sem dono → master`); } }
 
 // ---- /api/config ----
 app.get('/api/config', (req, res) => {
