@@ -7,7 +7,7 @@
 
 import { state, esc, toast, setModel, setUserKey, setAccessPass, resetRun, mergeArtifacts } from './state.js';
 import { initFX, startClock } from './fx.js';
-import { getConfig, auth, getHistory, saveHistory, deleteHistory, getStorage, backupBlogs, restoreBlogs, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
+import { getConfig, auth, getHistory, saveHistory, deleteHistory, generateBrief, getStorage, backupBlogs, restoreBlogs, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
 import { makeRunView, exportJson } from './render.js';
 import { initWizard, collectParams, selectedBlocks, gotoStep } from './wizard.js';
 import './anim.js'; // efeitos que exigem JS: boot do gate, ripple, View Transitions
@@ -103,7 +103,7 @@ function enterApp() {
   $('#app').classList.remove('hidden');
   initWizard();
   buildClassic();
-  wireTabs(); wireModes(); wireKeyModal(); wireOptimizer(); wireOutputActions(); wireBlogs(); wirePublisher();
+  wireTabs(); wireModes(); wireKeyModal(); wireOptimizer(); wireOutputActions(); wireBlogs(); wirePublisher(); wireBrief();
   if (!state.cfg.serverKey && !state.userKey) $('#keyModal').classList.remove('hidden');
   loadHistory();
 }
@@ -506,6 +506,35 @@ function setBusy(on) { const d = $('#connDot'); if (d) d.classList.toggle('busy'
    v4.1 — PUBLISHER: aba Blogs + painel de publicação
    ============================================================ */
 let blogsCache = [];
+
+/* ---------- v4.1.2: brief opcional do nicho ---------- */
+function wireBrief() {
+  const tg = $('#briefToggle'), body = $('#briefBody'), ta = $('#brief'), cnt = $('#briefCount'), st = $('#briefState');
+  if (!tg || !body || !ta) return;
+  const refresh = function () {
+    const n = ta.value.trim().length;
+    cnt.textContent = n ? n + ' caracteres' : '';
+    st.textContent = n ? '● ativo' : '';
+    st.className = 'brief-state' + (n ? ' on' : '');
+  };
+  tg.addEventListener('click', function () { body.classList.toggle('hidden'); });
+  ta.addEventListener('input', refresh);
+  $('#briefClear').addEventListener('click', function () { ta.value = ''; refresh(); });
+  $('#briefGen').addEventListener('click', function () {
+    const niche = $('#niche').value.trim();
+    if (!niche) { toast('Digite o nicho primeiro.'); return; }
+    if (ta.value.trim() && !confirm('Substituir o brief atual pelo gerado?')) return;
+    const btn = $('#briefGen'); btn.disabled = true; btn.textContent = '⏳ gerando…';
+    generateBrief({ niche: niche, campaignLang: $('#campaignLang').value, contentLang: $('#contentLang').value, geoCountry: $('#geoCountry').value, tone: $('#briefTone').value.trim(), model: state.model })
+      .then(function (r) {
+        if (r && r.brief) { ta.value = r.brief; refresh(); body.classList.remove('hidden'); toast('Brief gerado — revise e ajuste antes de rodar'); }
+        else toast('Falha ao gerar brief: ' + ((r && r.error) || '?'));
+      })
+      .catch(function (e) { toast('Falha ao gerar brief: ' + e.message); })
+      .finally(function () { btn.disabled = false; btn.textContent = '🤖 gerar brief'; });
+  });
+  refresh();
+}
 
 function wireBlogs() {
   if (!$('#blogAdd')) return;

@@ -85,6 +85,24 @@ app.post('/api/auth', (req, res) => {
   res.status(401).json({ ok: false, error: 'Senha incorreta.' });
 });
 
+// ---- /api/brief — v4.1.2: gera o BRIEF detalhado do nicho (opcional) ----
+app.post('/api/brief', async (req, res) => {
+  if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
+  const apiKey = resolveKey(req);
+  if (!apiKey) return res.status(400).json({ error: 'Sem API key. Configure no servidor ou insira a sua.' });
+  const b = req.body || {};
+  const niche = String(b.niche || '').trim();
+  if (!niche) return res.status(400).json({ error: 'Informe o nicho.' });
+  const { createMessage, DEFAULT_MODEL } = require('./lib/claude');
+  const model = MODELS.some(m => m.id === b.model) ? b.model : DEFAULT_MODEL;
+  try {
+    const { buildBriefPrompt } = require('./lib/blocks');
+    const out = await createMessage({ apiKey, model, system: buildSystemPrompt(), user: buildBriefPrompt({ niche, campaignLang: b.campaignLang, contentLang: b.contentLang, geoCountry: b.geoCountry, tone: b.tone, notes: b.notes }), maxTokens: 4000, timeoutMs: 90000 });
+    const text = String(out && (out.text || out) || '').replace(/^```[a-z]*\n?|```$/g, '').trim();
+    res.json({ ok: true, brief: text, model });
+  } catch (e) { res.status(500).json({ error: e.message || String(e) }); }
+});
+
 // ---- /api/run — ÚNICO endpoint de geração (SSE) ----
 // Auth ANTES de virar stream: falha => 401/400 application/json. Só depois SSE.
 app.post('/api/run', async (req, res) => {

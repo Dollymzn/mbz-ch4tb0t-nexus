@@ -216,3 +216,15 @@ test('v4.1.1 — títulos compactos: prompts pedem ≤60/≤55 e o postprocess a
   assert.equal(out.titles[1].length, 70);
   assert.equal(out._warnings.length, 1);
 });
+
+test('v4.1.2 — brief opcional: entra no contexto de todo bloco, o crítico trata NÃO FAZER como eliminatório, e buildBriefPrompt pede as seções', () => {
+  const { buildBriefPrompt } = require('../lib/blocks');
+  const withB = buildBlockPrompt('page_name', { niche: 'x', brief: 'ANGLE: a\nDO NOT: b' });
+  assert.ok(withB.includes('BRIEF DO NICHO') && withB.includes('DO NOT: b'));
+  assert.ok(!buildBlockPrompt('page_name', { niche: 'x' }).includes('BRIEF DO NICHO'), 'vazio = comportamento padrão');
+  const rv = buildBlockPrompt('review', { review: { target: 'broadcast', json: {}, params: { niche: 'x', brief: 'DO NOT: y' } } });
+  assert.ok(rv.includes('ELIMINATÓRIO'));
+  assert.ok(!buildBlockPrompt('review', { review: { target: 'broadcast', json: {}, params: { niche: 'x' } } }).includes('ELIMINATÓRIO'));
+  const bp = buildBriefPrompt({ niche: 'Carta de Amor', campaignLang: 'en-US', tone: 'sensual' });
+  ['ANGLE', 'TONE', 'PERSONA', 'TRIGGERS', 'DESIRED STRUCTURE', 'DO NOT', 'Tom pedido: sensual', 'en-US'].forEach(k => assert.ok(bp.includes(k), k));
+});

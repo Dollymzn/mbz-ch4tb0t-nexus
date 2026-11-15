@@ -180,6 +180,9 @@ export function addBlog(data) {
 export function deleteBlog(id) {
   return fetch('/api/blogs/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() }).then(function (r) { return r.json(); });
 }
+export function generateBrief(payload) {
+  return fetch('/api/brief', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) }).then(function (r) { return r.json(); });
+}
 export function getStorage() {
   return fetch('/api/storage', { headers: authHeaders() }).then(function (r) { return r.json(); });
 }

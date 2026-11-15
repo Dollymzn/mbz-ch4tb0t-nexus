@@ -235,3 +235,15 @@ Click-to-Messenger, nos dois formatos que a Meta aceita (testados no Ads Manager
 **Títulos compactos** — P1 ≤60 chars/9 palavras, P2 ≤55/8 (regra no prompt com exemplo de tamanho); artigos
 compactam o título se vier longo; `postprocess/titles.js` normaliza espaços/reticências e avisa no card quando estoura
 (sem cortar cego — corte estraga o gancho).
+
+## 17. v4.1.2 — Brief opcional do nicho
+- Passo 1 ganhou "✎ brief detalhado (opcional)": textarea recolhida; vazio = comportamento de sempre (só o nicho).
+- Preenchido, o brief entra em **todos** os blocos como `BRIEF DO NICHO` no contexto (até 6.000 chars) e o crítico
+  passa a avaliar aderência (ângulo/tom/persona/gatilhos) com a seção **NÃO FAZER como critério eliminatório**.
+- Botão **🤖 gerar brief** → `POST /api/brief` (`createMessage`, não-stream, 4k tokens) com `buildBriefPrompt`: promessa
+  em 1 linha + ANGLE / TONE / PERSONA / TRIGGERS / DESIRED STRUCTURE / DO NOT, no idioma da campanha, 1.600-2.400
+  chars, o máximo de apelo que Meta/AdX toleram. Campo "tom" opcional (ex.: "sensual e apelativo"). Confirma antes de
+  substituir um brief existente; "limpar" zera. Contador e estado "● ativo" no toggle.
+- `params.brief` vai no histórico junto com os outros parâmetros (duplicar funil no futuro já carrega o brief).
+- Próximo (depende do Frame): chave de API pessoal → Nexus como cliente MCP do Frame com o token guardado só no
+  navegador de cada pessoa (ver mensagem enviada ao Marcelo).

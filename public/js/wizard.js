@@ -208,7 +208,7 @@ export function updateSummary() {
 export function collectParams() {
   const ps = $('#persona');
   state.params = {
-    niche: $('#niche').value.trim(), pageName: $('#pageName').value.trim(), geoCountry: $('#geoCountry').value.trim(),
+    niche: $('#niche').value.trim(), brief: ($('#brief') ? $('#brief').value.trim() : ''), pageName: $('#pageName').value.trim(), geoCountry: $('#geoCountry').value.trim(),
     flowLang: $('#flowLang').value, contentLang: $('#contentLang').value, campaignLang: $('#campaignLang').value, currency: $('#currency').value,
     persona: ps.value, personaLabel: ps.options[ps.selectedIndex] ? ps.options[ps.selectedIndex].text : '',
     onboardRoutes: +$('#onboardRoutes').value, onboardRouteType: $('#onboardRouteType').value,

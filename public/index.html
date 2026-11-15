@@ -73,6 +73,18 @@
           <div class="big-field">
             <input type="text" id="niche" placeholder="ex: Carta de Amor, Copa do Mundo, Cartão de Crédito">
           </div>
+          <div class="brief-box">
+            <button type="button" class="brief-toggle" id="briefToggle">✎ brief detalhado <span class="muted">(opcional — ângulo, tom, persona, gatilhos, não-fazer)</span> <span class="brief-state" id="briefState"></span></button>
+            <div class="brief-body hidden" id="briefBody">
+              <textarea id="brief" rows="12" placeholder="Vazio = comportamento padrão (só o nicho). Cole aqui o brief da campanha ou clique em GERAR BRIEF: o texto entra em TODOS os blocos como fonte de verdade e a seção NÃO FAZER vira critério eliminatório do crítico."></textarea>
+              <div class="brief-actions">
+                <input type="text" id="briefTone" placeholder="tom (opcional): sensual e apelativo / sóbrio / urgente…">
+                <button type="button" class="mini-btn" id="briefGen">🤖 gerar brief</button>
+                <button type="button" class="mini-btn ghost" id="briefClear">limpar</button>
+                <span class="brief-count" id="briefCount"></span>
+              </div>
+            </div>
+          </div>
           <div class="geo-row">
             <div class="geo-field">
               <label>🎯 País-alvo (GEO)</label>
@@ -503,7 +515,7 @@
     <div id="blogList" class="blog-list"></div>
   </section>
 
-  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.1.1 · <span id="modelFoot"></span></footer>
+  <footer class="foot">// MBOLIVEIRAZ MEDIA &amp; TECH · CH4TB0T NEXUS v4.1.2 · <span id="modelFoot"></span></footer>
 </div>
 
 <!-- ===== API KEY MODAL ===== -->
