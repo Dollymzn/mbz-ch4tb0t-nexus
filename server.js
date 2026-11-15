@@ -153,11 +153,11 @@ function pickTextIndices(pageTexts, headline, cta) {
   const norm = (x) => x.replace(/\s+/g, ' ').trim().toLowerCase();
   let h = arr.find(x => headline && norm(x.t) === norm(headline));
   let c = arr.find(x => cta && norm(x.t) === norm(cta));
-  // sem match exato: convenção dos modelos da Moodlr = texto 1 título, texto 2 CTA; senão maior/menor
-  if (!h && !c && arr.length >= 2) { h = arr.find(x => x.i === 1) || null; c = arr.find(x => x.i === 2) || null; }
-  const rest = arr.filter(x => x !== h && x !== c);
-  if (!h) h = rest.slice().sort((p, q) => q.t.length - p.t.length)[0] || null;
-  if (!c) c = rest.filter(x => x !== h).slice().sort((p, q) => p.t.length - q.t.length)[0] || null;
+  // sem match exato: ignora textos sem letras (setas, emoji) — título = o primeiro, CTA = o último
+  const worded = arr.filter(x => (x.t.match(/\p{L}/gu) || []).length >= 2);
+  const rest = worded.filter(x => x !== h && x !== c);
+  if (!h) h = rest[0] || null;            // convenção dos kits da Moodlr: texto 1 = título
+  if (!c) c = rest.filter(x => x !== h).slice(-1)[0] || null; // o último = botão
   return { h: h ? h.i : null, c: c ? c.i : null };
 }
 app.post('/api/frame/send', async (req, res) => {
@@ -170,7 +170,8 @@ app.post('/api/frame/send', async (req, res) => {
   const narr = b.narracao && typeof b.narracao === 'object' ? b.narracao : null;
   const single = b.single !== false;
   const baseDesign = /^[0-9a-f-]{36}$/i.test(String(b.baseDesign || '')) ? String(b.baseDesign) : null; // molde existente (zero IA)
-  const IMG_SUFFIX = ' — clean composition with empty space for a headline, no text anywhere in the image, no letters, no logos, no watermark';
+  const fontes = (Array.isArray(b.fontes) ? b.fontes : []).map(x => String(x).trim().slice(0, 60)).filter(Boolean).slice(0, 12);
+  const variar = b.variar !== false;
   const sse = openSSE(res);
   const emit = (ev, d) => sse.send(ev, d);
   const designs = []; const warnings = [];
@@ -195,22 +196,33 @@ app.post('/api/frame/send', async (req, res) => {
       }
       let final = seed;
       if (items.length > 1 || baseDesign) {
-        // ---- 2) índices dos textos do molde ----
-        let hIdx = null, cIdx = null;
+        // ---- 2) páginas do molde: cada página com título+CTA editáveis é um LAYOUT; os criativos alternam entre elas ----
+        let layouts = []; let moldeFmt = null;
         try {
           const vd = await frame.frameCall(key, 'frame_ver_design', { design: seed.id, miniaturas: false }, { timeoutMs: 60000 });
-          const pg0 = (vd && (vd.paginas || vd.pages) || [])[0] || {};
-          const idx = pickTextIndices(pg0.textos || pg0.texts || [], items[0].headline, items[0].cta);
-          hIdx = idx.h; cIdx = idx.c;
-          if (!hIdx) warn('não achei o texto do headline no molde — as páginas vão sem troca de headline');
+          // o fundo é gerado na proporção do MOLDE, não na do seletor do painel
+          if (vd && vd.largura && vd.altura) { const r = vd.largura / vd.altura; moldeFmt = [['post', 1], ['story', 1080 / 1920], ['retrato', 1080 / 1350], ['link', 1200 / 628]].sort((x, y) => Math.abs(x[1] - r) - Math.abs(y[1] - r))[0][0]; }
+          if (baseDesign && !(narr && Array.isArray(narr.roteiros) && narr.roteiros.length) && ((vd && vd.paginas) || []).some(pg => pg && pg.narracao)) warn('o molde tem narração e ela é copiada em todas as páginas — ligue a narração (bloco Áudios) pra refazer, senão os criativos saem com o áudio do kit');
+          ((vd && (vd.paginas || vd.pages)) || []).forEach((pg, k) => {
+            const idx = pickTextIndices(pg.textos || pg.texts || [], k === 0 ? items[0].headline : null, k === 0 ? items[0].cta : null);
+            if (idx.h) layouts.push({ pagina: pg.pagina || k + 1, h: idx.h, c: idx.c });
+          });
         } catch (e) { warn('ver_design do molde: ' + e.message); }
+        if (!layouts.length) {
+          if (baseDesign) throw new Error('o molde não tem texto editável (título/CTA) em nenhuma página — use um design com título e botão como objetos de texto, não desenhados na imagem');
+          warn('não achei o texto do headline no molde — as páginas vão sem troca de headline'); layouts = [{ pagina: 1, h: null, c: null }];
+        }
+        emit('frame_progress', { step: 'molde', message: layouts.length > 1 ? layouts.length + ' layouts no molde — alternando entre eles' : '1 layout no molde' + (variar ? ' — variando o estilo do título por página' : '') });
+        const layoutOf = (i) => layouts[i % layouts.length];
+        const txOf = (i) => { const L = layoutOf(i); const tx = []; if (L.h && items[i].headline) tx.push({ indice: L.h, texto: String(items[i].headline).slice(0, 600) }); if (L.c && items[i].cta) tx.push({ indice: L.c, texto: String(items[i].cta).slice(0, 600) }); return tx; };
         // ---- 3) imagens das outras cenas ----
-        const fmt = items[0].formato || 'post';
+        const fmt = (baseDesign && moldeFmt) || items[0].formato || 'post';
+        if (baseDesign && moldeFmt && items[0].formato && moldeFmt !== items[0].formato) emit('frame_progress', { step: 'molde', message: 'fundos gerados no formato do molde (' + moldeFmt + ')' });
         // com molde da IA, a página 1 já tem o fundo do criativo 1; com molde existente, gera imagem pra TODAS
         const startAt = baseDesign ? 0 : 1;
         const pages = [];
         if (!baseDesign) {
-          const t0 = []; if (hIdx && items[0].headline) t0.push({ indice: hIdx, texto: String(items[0].headline).slice(0, 600) }); if (cIdx && items[0].cta) t0.push({ indice: cIdx, texto: String(items[0].cta).slice(0, 600) });
+          const t0 = txOf(0);
           pages.push(t0.length ? { pagina: 1, textos: t0 } : { pagina: 1 });
         }
         // imagens: 2 por vez (limite do Frame de trabalhos simultâneos), com retry
@@ -218,17 +230,16 @@ app.post('/api/frame/send', async (req, res) => {
         const genOne = async (i) => {
           emit('frame_progress', { step: 'imagem', i: i + 1, n: items.length });
           try {
-            const scene = String(items[i].scene || items[i].briefing).slice(0, 1300);
-            const ri = await frame.frameCall(key, 'frame_gerar_imagem', { prompt: (scene + IMG_SUFFIX).slice(0, 1500), formato: fmt }, { timeoutMs: 120000, onRetry });
+            const ri = await frame.frameCall(key, 'frame_gerar_imagem', { prompt: frame.imagePrompt(items[i].scene || items[i].briefing), formato: fmt }, { timeoutMs: 120000, onRetry });
             imgIds[i] = (ri && ((ri.imagem && (ri.imagem.id || (typeof ri.imagem === 'string' && ri.imagem))) || ri.id || (ri.asset && ri.asset.id))) || firstUuid(ri);
             if (!imgIds[i]) warn('imagem ' + (i + 1) + ': o Frame não devolveu o id');
           } catch (e) { warn('imagem ' + (i + 1) + ': ' + e.message); }
         };
         for (let i = startAt; i < items.length; i += 2) await Promise.all([genOne(i), i + 1 < items.length ? genOne(i + 1) : null]);
         for (let i = startAt; i < items.length; i++) {
-          const pg = { pagina: 1 };
+          const pg = { pagina: layoutOf(i).pagina };
           if (imgIds[i]) pg.imagem = imgIds[i];
-          const tx = []; if (hIdx && items[i].headline) tx.push({ indice: hIdx, texto: String(items[i].headline).slice(0, 600) }); if (cIdx && items[i].cta) tx.push({ indice: cIdx, texto: String(items[i].cta).slice(0, 600) });
+          const tx = txOf(i);
           if (tx.length) pg.textos = tx;
           pages.push(pg);
         }
@@ -239,6 +250,20 @@ app.post('/api/frame/send', async (req, res) => {
         if (!fd) throw new Error('o Frame não devolveu o id do design final');
         final = Object.assign({ papel: 'final', paginas: pages.length }, fd);
         emit('frame_progress', { step: 'design', design: final });
+        // ---- 4b) variação do título: roda a FONTE por página (mantém faixa e animação do molde).
+        //      Kit com vários layouts: só se o usuário informou fontes — o estilo de cada página do kit é respeitado. ----
+        const pool = (variar && layouts.length === 1) || fontes.length ? frame.fontsFor(idiomas, fontes) : null;
+        if (((variar && layouts.length === 1) || fontes.length) && !pool) warn('fonte do título não variada: há idioma de alfabeto não latino no lote e as traduções herdam a fonte');
+        if (pool) {
+          emit('frame_progress', { step: 'estilo', n: pages.length });
+          let fail = 0;
+          for (let i = 0; i < pages.length; i++) {
+            const L = layoutOf(i); if (!L.h) continue;
+            const st = frame.titleStyle(i, pool);
+            try { await frame.frameCall(key, 'frame_estilizar_textos', { design: final.id, pagina: i + 1, itens: [Object.assign({ indice: L.h }, st)] }, { timeoutMs: 60000, onRetry }); }
+            catch (e) { if (++fail <= 3) warn('fonte da página ' + (i + 1) + ': ' + e.message); if (fail === 3) { warn('fontes: parei de tentar (3 erros) — feche o design no Frame se ele estiver aberto'); break; } }
+          }
+        }
       }
       if (final !== seed) designs.push(Object.assign({ papel: 'molde' }, seed));
       designs.push(final);

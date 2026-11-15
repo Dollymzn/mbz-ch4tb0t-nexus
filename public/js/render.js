@@ -11,7 +11,7 @@
 'use strict';
 
 import { state, esc, safeParse, toast, setResult, mergeArtifacts } from './state.js';
-import { runStream, frameSendStream } from './api.js';
+import { runStream, frameSendStream, frameCall } from './api.js';
 import { emit as fxEmit } from './fx.js';
 
 /* ---------- catálogo de blocos (kind = como renderizar/exportar) ---------- */
@@ -1014,7 +1014,9 @@ function framePanelHtml(j) {
       '<label>quantos <input type="number" class="frame-n" min="1" max="' + Math.max(1, n) + '" value="' + n + '"></label>' +
       '<label>idiomas <input type="text" class="frame-langs" value="' + esc(lang) + '" placeholder="pt-BR, es, en (até 5)"></label>' +
       '<label class="switch-inline" title="usa a voz principal e os roteiros do bloco Áudios"><input type="checkbox" class="frame-narr"' + (audios ? ' checked' : '') + '><span class="slider"></span> <span class="frame-narr-label">narração' + (voice ? ' (' + esc(voice.name) + ')' : audios ? '' : ' — gere o bloco Áudios') + '</span></label>' +
-      '<label title="opcional: id ou link de um design SEU com 1 página (fundo + título + CTA) — vira o molde sem gastar IA no layout">molde <input type="text" class="frame-base" placeholder="id/link de um design seu (opcional)"></label>' +
+      '<label title="id ou link de um design SEU que serve de KIT DE LAYOUTS: cada página com título + botão editáveis é um layout (fundo do título, fonte, animação do CTA do jeito que você montou no Frame). Os criativos alternam entre as páginas — 5 páginas = 5 layouts rodando.">molde / kit <input type="text" class="frame-base" list="frameKits" placeholder="id/link — ou escolha um design seu com KIT no nome"><datalist id="frameKits"></datalist></label>' +
+      '<label class="switch-inline" title="com molde de 1 layout só: roda a fonte do título página a página (mantém a caixa e a animação). Fundo do título, contorno e animação do CTA variam pelo kit — monte páginas diferentes no molde."><input type="checkbox" class="frame-vary" checked><span class="slider"></span> variar fonte do título</label>' +
+      '<label title="opcional: restrinja às fontes que quiser (separadas por vírgula). Vazio = rodízio automático. Aceitas: Anton, Archivo Black, Baloo 2, Bangers, Bebas Neue, Cinzel, Exo 2, Fredoka, Jost, Kalam, Libre Franklin, Luckiest Guy, Manrope, Nunito, Oswald, Permanent Marker, Playfair Display, Plus Jakarta Sans, Poppins, Quicksand, Roboto, Russo One, Sora, Source Sans 3">fontes <input type="text" class="frame-fonts" placeholder="vazio = rodízio automático"></label>' +
       '<label class="switch-inline" title="ligado: um design só, uma página por criativo (narração 1 roteiro por página). desligado: um design por criativo"><input type="checkbox" class="frame-single" checked><span class="slider"></span> um design com todas as páginas</label>' +
       '<label class="switch-inline"><input type="checkbox" class="frame-studio"><span class="slider"></span> mandar pro Creative Studio</label>' +
     '</div>' +
@@ -1030,6 +1032,15 @@ function refreshFramePanel(card) {
 export function wireFramePanel(card) {
   const panel = card.bodyEl.querySelector('.frame-panel'); if (!panel) return;
   const go = panel.querySelector('.frame-go'); if (!go) return;
+  // kits: designs da conta com "KIT" no nome viram sugestões do campo molde
+  const dl = panel.querySelector('datalist');
+  if (dl && !dl.dataset.loaded) {
+    dl.dataset.loaded = '1';
+    frameCall('frame_listar_designs', { busca: 'KIT' }).then(function (r) {
+      const list = (r && (r.designs || (r.result && r.result.designs))) || [];
+      dl.innerHTML = list.filter(function (d) { return d && d.id; }).map(function (d) { return '<option value="' + esc(d.id) + '">' + esc(d.nome || '') + ' · ' + esc(String(d.largura || '')) + '×' + esc(String(d.altura || '')) + '</option>'; }).join('');
+    }).catch(function () {});
+  }
   go.onclick = function () {
     const j = card.json || {}; const prompts = j.prompts || [];
     const fmt = panel.querySelector('.frame-fmt').value;
@@ -1042,7 +1053,7 @@ export function wireFramePanel(card) {
     const items = buildFrameItems(prompts.slice(0, n), copy && copy.headlines, langs[0] || state.params.campaignLang, fmt);
     if (!items.length) { toast('Sem prompts pra enviar.'); return; }
     const baseRaw = panel.querySelector('.frame-base').value.trim(); const baseM = baseRaw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-    const payload = { items: items, idiomas: langs, creativeStudio: panel.querySelector('.frame-studio').checked, single: panel.querySelector('.frame-single').checked, nome: (state.params.pageName || state.params.niche || 'NEXUS') + ' — criativos', baseDesign: baseM ? baseM[0] : null };
+    const payload = { items: items, idiomas: langs, creativeStudio: panel.querySelector('.frame-studio').checked, single: panel.querySelector('.frame-single').checked, nome: (state.params.pageName || state.params.niche || 'NEXUS') + ' — criativos', baseDesign: baseM ? baseM[0] : null, variar: panel.querySelector('.frame-vary').checked, fontes: panel.querySelector('.frame-fonts').value.split(',').map(function (x) { return x.trim(); }).filter(Boolean) };
     if (wantNarr) payload.narracao = { voz: audios.voice_main && audios.voice_main.id, modelo: 'eleven_v4', roteiros: (audios.audios || []).map(function (a) { return a.script; }) };
     const log = panel.querySelector('.frame-log'); const out = panel.querySelector('.frame-out');
     log.classList.remove('hidden'); log.innerHTML = ''; out.innerHTML = ''; go.disabled = true; go.textContent = '⏳ criando…';
@@ -1053,6 +1064,7 @@ export function wireFramePanel(card) {
         if (e.step === 'lote') line('📦 lote ' + e.lote + '/' + e.lotes + ' (' + e.n + ' criativos) — o Frame gera fundo + textos, pode levar minutos…');
         else if (e.step === 'molde') line('🧩 ' + esc(e.message));
         else if (e.step === 'imagem') line('🖼 imagem ' + e.i + '/' + e.n + '…');
+        else if (e.step === 'estilo') line('🎨 variando a fonte do título em ' + e.n + ' páginas…');
         else if (e.step === 'montar') line('📐 montando o design com ' + e.n + ' páginas…');
         else if (e.step === 'traduzir') line('🌐 traduzindo pra ' + esc((e.idiomas || []).join(', ')) + '…');
         else if (e.step === 'retry') line('⏳ Frame ocupado (' + esc(String(e.message).slice(0, 70)) + ') — tentando de novo em ' + Math.round(e.wait / 1000) + 's');
@@ -1078,7 +1090,7 @@ function buildFrameItems(prompts, headlines, lang, fmt) {
   const L = String(lang || 'pt').toLowerCase().split(/[-_]/)[0];
   const hs = (headlines || []).filter(Boolean);
   return prompts.map(function (p, i) {
-    const scene = String(p.prompt || p || '').trim(); if (!scene) return null;
+    const scene = String(p.scene || p.prompt || p || '').trim(); if (!scene) return null; // p.scene = arte SEM texto (v4.3.3); runs antigos caem no prompt e o servidor limpa
     const h = p.headline || (hs.length ? hs[i % hs.length] : '');
     const cta = p.cta || FRAME_CTA[L] || 'Learn more';
     const brief = ['Meta Ads creative for the niche "' + (state.params.niche || '') + '". Language: ' + L + '. Format: ' + fmt + '.',

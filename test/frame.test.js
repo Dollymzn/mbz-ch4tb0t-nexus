@@ -17,6 +17,11 @@ function fakeFrame(opts) {
       else if (name === 'frame_uso_hoje') result = { gastoUsd: { voce: 1.5, empresa: 2 }, tetoUsd: { voce: 40, empresa: 200 }, designsHoje: 3, limiteDesignsDia: 50 };
       else if (name === 'frame_criar_designs') result = { designs: args.itens.map((it, i) => ({ id: '11111111-1111-4111-8111-' + String(i + calls.length).padStart(12, '0'), nome: 'CRIATIVO ' + (i + 1), link: 'https://town.moodlr.digital/?tab=frame&design=x' + i })), avisos: args.itens.length > 1 ? ['um aviso'] : [] };
       else if (name === 'frame_narrar') result = { ok: true, design: args.design, paginas: (args.roteiro || []).length };
+      else if (name === 'frame_ver_design' && args.design === '84e3b1df-839e-4f3f-8a27-8afb5bdba24e') result = { id: args.design, paginas: [
+        { pagina: 1, textos: [{ indice: 1, texto: 'Someone Sent You This' }, { indice: 2, texto: '⬇' }, { indice: 3, texto: 'OPEN MY LETTER' }] },
+        { pagina: 2, textos: [] },
+        { pagina: 3, textos: [{ indice: 1, texto: 'AMOR\nANÔNIMO' }, { indice: 2, texto: 'VER CARTA' }] }], largura: 1080, altura: 1080 };
+      else if (name === 'frame_estilizar_textos') result = { ok: true };
       else if (name === 'frame_ver_design') result = { id: args.design, paginas: [{ numero: 1, textos: [{ indice: 1, texto: 'OPEN MY LETTER' }, { indice: 2, texto: 'Someone sealed a letter for you' }, { indice: 3, texto: 'extra' }] }] };
       else if (name === 'frame_gerar_imagem') {
         if (opts && opts.flaky && !srv.__flaked) { srv.__flaked = true; const m = { jsonrpc: '2.0', id: j.id, result: { isError: true, content: [{ type: 'text', text: 'Você já tem 2 trabalhos do Frame rodando. Espere um terminar.' }] } }; res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(m)); }
@@ -112,6 +117,9 @@ test('server — /api/frame/send: lotes de 7, narração por design, Creative St
   const studio = f.calls.find(c => c.params.name === 'frame_enviar_creative_studio').params.arguments;
   assert.deepEqual(studio.ids, ['33333333-3333-4333-8333-000000000001', '44444444-4444-4444-8444-000000000001'], 'studio sem o molde');
   assert.equal(done2.data.designs.length, 3); assert.equal(done2.data.designs[0].papel, 'molde'); assert.equal(done2.data.designs[1].paginas, 3); assert.equal(done2.data.designs[1].narrado, true); assert.equal(done2.data.designs[2].papel, 'traducao');
+  const sty = f.calls.filter(c => c.params.name === 'frame_estilizar_textos').map(c => c.params.arguments);
+  assert.deepEqual(sty.map(x => x.pagina), [1, 2, 3]);
+  assert.deepEqual(sty[0].itens, [{ indice: 2, fonte: 'Anton' }], 'só a fonte (faixa/contorno sobrepõem o efeito do Textbox)');
   // ---- molde existente (baseDesign): sem criar_designs, imagem pra todas as páginas ----
   f.calls.length = 0;
   const res3 = await fetch(B + '/api/frame/send', { method: 'POST', headers: H, body: JSON.stringify({ items: items3, idiomas: ['en-US'], baseDesign: '84e3b1df-839e-4f3f-8a27-8afb5bdba24e' }) });
@@ -121,6 +129,16 @@ test('server — /api/frame/send: lotes de 7, narração por design, Creative St
   assert.equal(n3.filter(n => n === 'frame_gerar_imagem').length, 3, 'imagem pra todas');
   const cdm3 = f.calls.find(c => c.params.name === 'frame_criar_de_modelo').params.arguments;
   assert.equal(cdm3.origem.design, '84e3b1df-839e-4f3f-8a27-8afb5bdba24e'); assert.equal(cdm3.paginas.length, 3); assert.ok(cdm3.paginas[0].imagem);
+  // kit: páginas 1 e 3 do molde têm texto → 2 layouts alternados; seta ignorada; página sem texto pulada
+  assert.deepEqual(cdm3.paginas.map(p => p.pagina), [1, 3, 1]);
+  assert.deepEqual(cdm3.paginas[0].textos, [{ indice: 1, texto: 'Someone sealed a letter for you' }, { indice: 3, texto: 'OPEN MY LETTER' }]);
+  assert.deepEqual(cdm3.paginas[1].textos, [{ indice: 1, texto: 'Headline 2' }, { indice: 2, texto: 'OPEN MY LETTER' }], 'texto 1 = título, último = botão');
+  assert.equal(n3.filter(n => n === 'frame_estilizar_textos').length, 0, 'kit com vários layouts: não mexe no estilo');
+  const img3 = f.calls.find(c => c.params.name === 'frame_gerar_imagem').params.arguments.prompt;
+  assert.ok(/no text of any kind/i.test(img3));
+  assert.equal(f.calls.find(c => c.params.name === 'frame_gerar_imagem').params.arguments.formato, 'post', 'formato do molde, não do painel');
+  // modo single com 1 layout: varia o estilo do título (página 1 mantém o molde)
+  const est = f.calls.length; void est;
   // sem chave
   const nk = await fetch(B + '/api/frame/whoami', { method: 'POST', headers: { 'content-type': 'application/json', 'x-access-pass': auth.token }, body: '{}' });
   assert.equal(nk.status, 400);
@@ -135,4 +153,17 @@ test('frame — retry em erro transitório ("já tem 2 trabalhos") com backoff',
   assert.ok(r.imagem && r.imagem.id); assert.equal(retries, 1);
   await assert.rejects(frame.frameCall('frm_ok', 'frame_mover_para_lixeira', {}, { url: f.url, retries: 0 }), /não permitida/);
   f.srv.close();
+});
+
+test('frame — cleanScene tira headline/botão/aspas do prompt de imagem', () => {
+  const c = frame.cleanScene('Pixel art envelope on a table. Bold headline reads "Someone Chose You". A red button with the text "OPEN". Warm palette.');
+  assert.equal(c, 'Pixel art envelope on a table. Warm palette.');
+  assert.ok(frame.cleanScene('Only "quoted" stuff here').length > 0);
+});
+
+test('frame — fontsFor: hindi só devanágari, não-latino não varia, custom validado', () => {
+  assert.equal(frame.fontsFor(['en', 'es'], [])[0], 'Anton');
+  assert.deepEqual(frame.fontsFor(['en', 'hi'], ['anton', 'poppins']), ['Poppins']);
+  assert.equal(frame.fontsFor(['en', 'ja'], []), null);
+  assert.deepEqual(frame.fontsFor(['pt'], ['bangers', 'Comic Sans']), ['Bangers']);
 });

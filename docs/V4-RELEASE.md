@@ -335,3 +335,12 @@ compactam o título se vier longo; `postprocess/titles.js` normaliza espaços/re
   Áudios agora pede roteiros de 15-20 s com **tags de emoção entre colchetes**.
 - Tradução em grupos de 5 idiomas (até 11 no campo); `avisos` da tradução viram warnings.
 - Studio: aviso de que a exportação roda no navegador ("Exportar agora" com a aba visível). Chave expira após 90 dias sem uso.
+
+## v4.3.3 — criativos do Frame variados e sem texto na imagem
+
+- **Texto duplicado na imagem (bug):** o fundo era gerado com o `prompt` do bloco de criativos, que descreve o anúncio completo (headline + botão desenhados). Agora o bloco devolve também `scene` (a mesma arte só como fundo, sem nenhum texto) e é ela que vai pro `frame_gerar_imagem`. Runs antigos: `cleanScene()` em `lib/frame.js` remove frases de headline/botão e trechos entre aspas. O prompt de imagem abre e fecha proibindo texto (`imagePrompt()`).
+- **Molde = kit de layouts:** todas as páginas do molde com título + CTA editáveis viram layouts; o criativo `i` usa a página `i % K`. Fundo do título, fonte e animação do CTA ficam como foram montados no Frame em cada página. Páginas sem texto editável são puladas; molde sem nenhuma dá erro claro.
+- **Índices de texto:** textos sem letras (setas, emoji) são ignorados; título = o mais longo, CTA = o último.
+- **Variar fonte do título** (ligado por padrão, só com molde de 1 layout): `frame_estilizar_textos` roda só a **fonte** por página — mantém a caixa e a animação. Faixa/contorno NÃO são variados pela API: são efeitos do Textbox (`atFx`) e o `faixa` do estilizar fica sobreposto. Hindi no lote → só fontes com devanágari; alfabeto não latino → não varia. Campo **fontes** restringe o rodízio.
+- Animação do CTA, fundo do título e contorno variam pelo **kit**: `criar_de_modelo` copia a animação (`anim`) de cada página do molde.
+- **Kits:** o campo molde sugere os designs da conta com "KIT" no nome (ex.: KIT CARTA SECRETA, 5 páginas). Texto 1 = título, último texto = botão. O fundo é gerado no formato do molde (kit 1080×1080 → post), ignorando o seletor do painel.
