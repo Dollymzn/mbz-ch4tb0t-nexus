@@ -61,3 +61,11 @@ test('blogs — owner: addBlog grava dono, claimOrphans migra, backup/restore po
   assert.equal(r.added, 1);
   assert.equal(blogs.getBlogOwner(blogs.listBlogs().find(b => b.url === 'https://c.com').id), 'G');
 });
+
+test('users — bootstrap aceita senha curta do ambiente (legado) e nunca lança', () => {
+  const a = fresh({ ACCESS_PASSWORD: 'abc' });
+  assert.equal(a.users.bootstrap().mode, 'legacy');
+  assert.ok(a.users.login('master', 'abc'), 'entra com a senha curta');
+  const b = fresh({ MASTER_USER: '!!!', MASTER_PASSWORD: 'x' });
+  assert.equal(b.users.bootstrap().mode, 'first-run', 'nome inválido → first-run, sem crash');
+});
