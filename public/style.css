@@ -1151,7 +1151,7 @@
 .brief-toggle .muted{opacity:.6}
 .brief-state{float:right;opacity:0}.brief-state.on{opacity:1;color:var(--cyan)}
 .brief-body{margin-top:10px}
-.brief-body textarea{width:100%;min-height:220px;font-size:13px;line-height:1.5;resize:vertical}
+.brief-body textarea{ width:100%; min-height:420px; font-family:var(--f-body); font-size:17px; line-height:1.7; letter-spacing:.2px; resize:vertical; padding:18px 20px; color:var(--text); background:rgba(8,10,24,.85); border-radius:10px }
 .brief-actions{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
 .brief-actions input{flex:1;min-width:220px;font-size:12px;padding:8px 10px}
 .brief-count{font-size:11px;opacity:.6;margin-left:auto}

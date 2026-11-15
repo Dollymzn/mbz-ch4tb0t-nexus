@@ -226,7 +226,7 @@ test('v4.1.2 — brief opcional: entra no contexto de todo bloco, o crítico tra
   assert.ok(rv.includes('ELIMINATÓRIO'));
   assert.ok(!buildBlockPrompt('review', { review: { target: 'broadcast', json: {}, params: { niche: 'x' } } }).includes('ELIMINATÓRIO'));
   const bp = buildBriefPrompt({ niche: 'Carta de Amor', campaignLang: 'en-US', tone: 'sensual' });
-  ['ANGLE', 'TONE', 'PERSONA', 'TRIGGERS', 'DESIRED STRUCTURE', 'DO NOT', 'Tom pedido: sensual', 'en-US'].forEach(k => assert.ok(bp.includes(k), k));
+  ['ÂNGULO', 'TOM', 'PERSONA', 'GATILHOS', 'ESTRUTURA', 'NÃO FAZER', 'Tom pedido: sensual', 'en-US'].forEach(k => assert.ok(bp.includes(k), k));
 });
 
 test('v4.2 — personas: todas com voice+look, grupos, custom e marca sem rosto; nomes 3/3/3 com grupo e exclusão', () => {
@@ -250,7 +250,7 @@ test('v4.2.1 — brief: nome da página tem precedência; gerador não inventa n
   const { buildBriefPrompt } = require('../lib/blocks');
   assert.ok(buildBlockPrompt('onboard', { niche: 'x', pageName: 'The Love Note', brief: 'PERSONA: Aurora del Amor' }).includes('prevalecem o NOME DA PÁGINA'));
   const a = buildBriefPrompt({ niche: 'Carta de Amor', campaignLang: 'en-US', pageName: 'The Love Note', personaLabel: 'Feminina romântica', persona: 'fem_romantica', personaVoice: 'doce' });
-  assert.ok(a.includes('NOME DA PÁGINA JÁ DEFINIDO: "The Love Note"') && a.includes('PERSONA JÁ ESCOLHIDA: Feminina romântica — doce') && a.includes('SEM nome próprio inventado') && a.includes('instruções em PORTUGUÊS'));
+  assert.ok(a.includes('NOME DA PÁGINA JÁ DEFINIDO: "The Love Note"') && a.includes('PERSONA JÁ ESCOLHIDA: Feminina romântica — doce') && a.includes('SEM nome próprio inventado') && a.includes('instruções em PORTUGUÊS') && a.includes('💌 PROMESSA') && a.includes('TEXTO PURO'));
   const b = buildBriefPrompt({ niche: 'x', campaignLang: 'en-US' });
   assert.ok(b.includes('NÃO invente nome próprio') && !b.includes('PERSONA JÁ ESCOLHIDA'));
 });
