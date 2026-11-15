@@ -81,3 +81,11 @@ test('users — MASTER_* manda sempre: cria o master mesmo com users.json existe
   assert.equal(a.users.login('teteu', 'nova123'), null); assert.ok(a.users.login('teteu', 'outra123'));
   assert.equal(a.users.bootstrap().mode, 'users', 'sem mudança → nada a fazer');
 });
+
+test('blogs — setOwner transfere o blog', () => {
+  const { blogs } = fresh({});
+  const b = blogs.addBlog({ name: 'A', url: 'https://a.com', user: 'u', appPassword: 'pw' }, 'M');
+  assert.equal(blogs.setOwner(b.id, 'G').owner, 'G');
+  assert.equal(blogs.getBlogOwner(b.id), 'G');
+  assert.throws(() => blogs.setOwner('nope', 'G'), /não encontrado/);
+});

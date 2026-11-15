@@ -7,7 +7,7 @@
 
 import { state, esc, toast, setModel, setUserKey, setAccessPass, resetRun, mergeArtifacts } from './state.js';
 import { initFX, startClock, initCyberpunk, bootScreen } from './fx.js';
-import { getConfig, auth, getUsers, createUser, setUserPassword, setUserActive, changeMyPassword, getHistory, saveHistory, deleteHistory, generateBrief, getStorage, backupBlogs, restoreBlogs, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
+import { getConfig, auth, setBlogOwner, getUsers, createUser, setUserPassword, setUserActive, changeMyPassword, getHistory, saveHistory, deleteHistory, generateBrief, getStorage, backupBlogs, restoreBlogs, getBlogs, addBlog, deleteBlog, testBlog, publishStream } from './api.js';
 import { makeRunView, exportJson, funnelFiles } from './render.js';
 import { makeZip, downloadBlob } from './zip.js';
 import { initWizard, collectParams, selectedBlocks, gotoStep } from './wizard.js';
@@ -665,9 +665,11 @@ function showStorageBanner(st) {
   else { el.className = 'storage-banner warn'; el.innerHTML = '⚠ armazenamento <b>EFÊMERO</b> (<span class="pin">' + esc(st.dir) + '</span>): blogs e histórico somem a cada deploy. No Railway: <b>Settings → Volumes → Add Volume</b> com mount path <code>/data</code> e variável <code>DATA_DIR=/data</code>. Enquanto isso, um backup cifrado fica neste navegador e é restaurado sozinho.'; }
 }
 
+let usersCache = [];
 function loadBlogs(afterRestore) {
   const list = $('#blogList'); if (!list) return;
   list.innerHTML = '<p class="step-help">carregando…</p>';
+  if (state.me && state.me.role === 'master' && !usersCache.length) { getUsers().then(function (u) { if (Array.isArray(u)) { usersCache = u; loadBlogs(afterRestore); } }).catch(function () {}); return; }
   getStorage().then(showStorageBanner).catch(function () {});
   getBlogs().then(function (arr) {
     blogsCache = Array.isArray(arr) ? arr : [];
@@ -687,9 +689,10 @@ function loadBlogs(afterRestore) {
     list.innerHTML = blogsCache.map(function (b) {
       const ok = b.last_ok ? ('✓ ' + esc(b.last_ok.user || '') + (b.last_ok.gridRest ? ' · grid REST' : ' · ⚠ sem grid REST') + ' · ' + esc(String(b.last_ok.at || '').slice(0, 16).replace('T', ' '))) : 'nunca testado';
       return '<div class="blog-row" data-id="' + esc(b.id) + '">' +
-        '<div class="blog-info"><b>' + esc(b.name) + '</b>' + (b.owner_name && !b.mine ? '<span class="pin owner-pin">@' + esc(b.owner_name) + '</span>' : '') + '<span class="pin">' + esc(b.url) + '</span><small>usuário <b>' + esc(b.user) + '</b> · ' + ok + (b.defaultCategory ? ' · categoria ' + esc(b.defaultCategory) : '') + '</small><div class="blog-test-out"></div></div>' +
+        '<div class="blog-info"><b>' + esc(b.name) + '</b>' + (b.owner_name && !b.mine ? '<span class="pin owner-pin">@' + esc(b.owner_name) + '</span>' : '') + (state.me && state.me.role === 'master' ? '<label class="owner-sel">dono: <select data-owner>' + usersCache.map(function (u) { return '<option value="' + esc(u.id) + '"' + (u.id === b.owner ? ' selected' : '') + '>' + esc(u.name) + (u.role === 'master' ? ' ★' : '') + '</option>'; }).join('') + '</select></label>' : '') + '<span class="pin">' + esc(b.url) + '</span><small>usuário <b>' + esc(b.user) + '</b> · ' + ok + (b.defaultCategory ? ' · categoria ' + esc(b.defaultCategory) : '') + '</small><div class="blog-test-out"></div></div>' +
         '<div class="blog-actions"><button class="mini-btn blog-test">🔌 testar</button><button class="mini-btn blog-del">✕ remover</button></div></div>';
     }).join('');
+    list.querySelectorAll('[data-owner]').forEach(function (sel) { sel.onchange = function () { const id = sel.closest('.blog-row').dataset.id; setBlogOwner(id, sel.value).then(function (r) { if (r.ok) { toast('Blog transferido'); loadBlogs(); } else toast('Erro: ' + (r.error || '?')); }); }; });
     $$('.blog-test').forEach(function (btn) {
       btn.onclick = function () {
         const row = btn.closest('.blog-row'); const out = row.querySelector('.blog-test-out'); out.textContent = 'testando…';

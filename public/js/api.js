@@ -31,6 +31,7 @@ export function getUsers() { return fetch('/api/users', { headers: authHeaders()
 export function createUser(data) { return fetch('/api/users', { method: 'POST', headers: authHeaders(), body: JSON.stringify(data) }).then(function (r) { return r.json(); }); }
 export function setUserPassword(id, password) { return fetch('/api/users/' + encodeURIComponent(id) + '/password', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ password: password }) }).then(function (r) { return r.json(); }); }
 export function setUserActive(id, active) { return fetch('/api/users/' + encodeURIComponent(id) + '/active', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ active: active }) }).then(function (r) { return r.json(); }); }
+export function setBlogOwner(id, owner) { return fetch('/api/blogs/' + encodeURIComponent(id) + '/owner', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ owner: owner }) }).then(function (r) { return r.json(); }); }
 export function changeMyPassword(current, password) { return fetch('/api/me/password', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ current: current, password: password }) }).then(function (r) { return r.json(); }); }
 export function getHistory() {
   return fetch('/api/history', { headers: authHeaders() }).then(function (r) { return r.json(); });

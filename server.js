@@ -229,6 +229,13 @@ app.delete('/api/blogs/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- /api/blogs/:id/owner — master transfere o blog pra um gestor ----
+app.post('/api/blogs/:id/owner', (req, res) => {
+  if (!requireMaster(req, res)) return;
+  const owner = String((req.body || {}).owner || '');
+  if (!users.findById(owner)) return res.status(400).json({ error: 'usuário não encontrado' });
+  try { res.json(Object.assign({ ok: true }, blogs.setOwner(req.params.id, owner))); } catch (e) { res.status(400).json({ error: e.message }); }
+});
 // ---- /api/blogs/:id/test — conexão, papel, rota do grid, categorias ----
 app.post('/api/blogs/:id/test', async (req, res) => {
   if (!checkPassword(req)) return res.status(401).json({ error: 'Acesso negado.' });
