@@ -1350,3 +1350,6 @@ html[data-fx="lite"] #fx{ opacity:.35 }
 
 .brief-body.locked textarea{ opacity:.45; cursor:not-allowed }
 .brief-body.locked .mini-btn:disabled{ opacity:.4; cursor:not-allowed }
+
+.persona-row{ margin-top:14px }
+.persona-row .persona-card{ max-width:820px; margin:0 auto }

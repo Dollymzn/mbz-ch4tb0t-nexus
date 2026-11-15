@@ -92,21 +92,6 @@
           <div class="big-field">
             <input type="text" id="niche" placeholder="ex: Carta de Amor, Copa do Mundo, Cartão de Crédito">
           </div>
-          <div class="brief-box">
-            <button type="button" class="brief-toggle" id="briefToggle">✎ brief detalhado <span class="muted">(opcional — ângulo, tom, persona, gatilhos, não-fazer)</span> <span class="brief-state" id="briefState"></span></button>
-            <div class="brief-body hidden" id="briefBody">
-              <textarea id="brief" rows="12" placeholder="Vazio = comportamento padrão (só o nicho). Cole aqui o brief da campanha ou clique em GERAR BRIEF: o texto entra em TODOS os blocos como fonte de verdade e a seção NÃO FAZER vira critério eliminatório do crítico."></textarea>
-              <div class="brief-actions">
-                <input type="text" id="briefTone" placeholder="tom (opcional): sensual e apelativo / sóbrio / urgente…">
-                <button type="button" class="mini-btn" id="briefGen">🤖 gerar brief</button>
-                <button type="button" class="mini-btn ghost" id="briefClear">limpar</button>
-                <span class="brief-count" id="briefCount"></span>
-              </div>
-              <div class="brief-tip">🔒 o brief destrava depois de escolher o <b>nome da página</b> — ele é escrito pra esse nome (e a persona, se já escolhida no passo 2).</div>
-              <div class="hidden">
-              </div>
-            </div>
-          </div>
           <div class="geo-row">
             <div class="geo-field">
               <label>🎯 País-alvo (GEO)</label>
@@ -120,10 +105,35 @@
           <div class="inline-suggest">
             <label>Nome da página no Facebook</label>
             <div class="suggest-row">
-              <input type="text" id="pageName" placeholder="ex: Aurora del Amor">
+              <input type="text" id="pageName" placeholder="ex: The Love Note">
               <button id="suggestName" class="btn-ghost-sm">✨ Sugerir do nicho + país</button>
             </div>
             <div class="suggest-chips" id="nameChips"></div>
+            <div class="persona-row">
+            <div class="sel-card persona-card">
+              <label>🎭 Persona</label>
+              <select id="persona"></select>
+              <small id="personaHint">Quem conversa com o lead</small>
+              <div id="personaCustomBox" class="hidden persona-custom">
+                <textarea id="personaCustom" rows="4" placeholder="VOZ: como ela/ele fala (tom, ritmo, vocabulário)… VISUAL (em inglês): idade aproximada, expressão, luz, roupa, ambiente, props…"></textarea>
+              </div>
+            </div>
+            </div>
+            <div class="brief-box">
+            <button type="button" class="brief-toggle" id="briefToggle">✎ brief detalhado <span class="muted">(opcional — ângulo, tom, gatilhos, estrutura, não-fazer)</span> <span class="brief-state" id="briefState"></span></button>
+            <div class="brief-body hidden" id="briefBody">
+              <textarea id="brief" rows="12" placeholder="Vazio = comportamento padrão (só o nicho). Cole aqui o brief da campanha ou clique em GERAR BRIEF: o texto entra em TODOS os blocos como fonte de verdade e a seção NÃO FAZER vira critério eliminatório do crítico."></textarea>
+              <div class="brief-actions">
+                <input type="text" id="briefTone" placeholder="tom (opcional): sensual e apelativo / sóbrio / urgente…">
+                <button type="button" class="mini-btn" id="briefGen">🤖 gerar brief</button>
+                <button type="button" class="mini-btn ghost" id="briefClear">limpar</button>
+                <span class="brief-count" id="briefCount"></span>
+              </div>
+              <div class="brief-tip">🔒 o brief destrava depois de escolher o <b>nome da página</b> e a <b>persona</b> — ele é escrito pra esse nome e essa voz.</div>
+              <div class="hidden">
+              </div>
+            </div>
+          </div>
             <div class="fb-photos-row">
               <button id="genFbPhotos" class="btn-ghost-sm">📸 Gerar fotos + bio + post</button>
             </div>
@@ -156,14 +166,6 @@
               <label>💰 Moeda local</label>
               <select id="currency"></select>
               <small>Usada na copy do Meta</small>
-            </div>
-            <div class="sel-card persona-card">
-              <label>🎭 Persona</label>
-              <select id="persona"></select>
-              <small id="personaHint">Quem conversa com o lead</small>
-              <div id="personaCustomBox" class="hidden persona-custom">
-                <textarea id="personaCustom" rows="4" placeholder="VOZ: como ela/ele fala (tom, ritmo, vocabulário)… VISUAL (em inglês): idade aproximada, expressão, luz, roupa, ambiente, props…"></textarea>
-              </div>
             </div>
             <div class="sel-card">
               <label>🤖 Modelo do Claude</label>
